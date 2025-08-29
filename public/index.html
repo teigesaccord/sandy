@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sandy - Your Personal Support Assistant</title>
     <meta name="description" content="Sandy is your compassionate AI support assistant, providing personalized recommendations and guidance for your unique needs.">
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23007bff'/%3E%3Ctext x='50' y='65' font-family='Arial' font-size='40' font-weight='bold' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
-    
+
     <!-- Preconnect for better performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <style>
         * {
             margin: 0;
@@ -303,32 +303,32 @@
         <div class="hero-section">
             <h1>Meet Sandy</h1>
             <p>Your compassionate AI support assistant designed to understand your unique physical needs, energy levels, and preferences. Get personalized recommendations delivered in plain language with easy navigation.</p>
-            
+
             <div class="features">
                 <div class="feature">
                     <h3>🎯 Personalized Support</h3>
                     <p>Tailored recommendations based on your individual physical capabilities, energy patterns, and personal goals.</p>
                 </div>
-                
+
                 <div class="feature">
                     <h3>🧠 Intelligent Conversations</h3>
                     <p>Natural, empathetic conversations powered by advanced AI that learns and adapts to your communication style.</p>
                 </div>
-                
+
                 <div class="feature">
                     <h3>📋 Smart Intake Forms</h3>
                     <p>Dynamic questionnaires that adapt based on your responses, creating a comprehensive support profile.</p>
                 </div>
-                
+
                 <div class="feature">
                     <h3>💡 Actionable Insights</h3>
                     <p>Clear, practical recommendations you can implement today, with gentle guidance for long-term goals.</p>
                 </div>
             </div>
-            
+
             <div class="user-actions">
-                <button class="action-btn" onclick="startChat()">Start Chatting</button>
-                <button class="action-btn secondary" onclick="learnMore()">Learn More</button>
+                <button class="action-btn" id="start-chat-btn">Start Chatting</button>
+                <button class="action-btn secondary" id="learn-more-btn">Learn More</button>
             </div>
         </div>
 
@@ -343,12 +343,12 @@
                     <span id="connection-status">Connected</span>
                 </div>
             </div>
-            
+
             <div class="loading active" id="loading">
                 <div class="spinner"></div>
                 <p>Initializing Sandy...</p>
             </div>
-            
+
             <!-- Chat interface will be inserted here -->
             <div id="chatbot-container" style="flex: 1; display: none;"></div>
         </div>
@@ -357,7 +357,7 @@
     <!-- Include our chatbot component -->
     <script type="module">
         import { Chatbot } from './chatbot.js';
-        
+
         let chatbot = null;
         let currentUserId = null;
         let isConnected = false;
@@ -369,19 +369,19 @@
                 // Generate or retrieve user ID
                 currentUserId = localStorage.getItem('sandy_user_id') || generateUserId();
                 localStorage.setItem('sandy_user_id', currentUserId);
-                
+
                 // Initialize WebSocket connection
                 await initializeWebSocket();
-                
+
                 // Initialize chatbot
                 initializeChatbot();
-                
+
                 // Hide loading, show chat
                 document.getElementById('loading').classList.remove('active');
                 document.getElementById('chatbot-container').style.display = 'flex';
-                
+
                 updateStatus('Ready to chat!');
-                
+
             } catch (error) {
                 console.error('Failed to initialize app:', error);
                 updateStatus('Connection failed. Please refresh the page.');
@@ -399,19 +399,19 @@
             return new Promise((resolve, reject) => {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}`;
-                
+
                 websocket = new WebSocket(wsUrl);
-                
+
                 websocket.onopen = () => {
                     isConnected = true;
                     updateConnectionStatus('Connected');
                     resolve();
                 };
-                
+
                 websocket.onmessage = (event) => {
                     handleWebSocketMessage(JSON.parse(event.data));
                 };
-                
+
                 websocket.onclose = () => {
                     isConnected = false;
                     updateConnectionStatus('Disconnected');
@@ -422,12 +422,12 @@
                         }
                     }, 3000);
                 };
-                
+
                 websocket.onerror = (error) => {
                     console.error('WebSocket error:', error);
                     reject(error);
                 };
-                
+
                 // Timeout after 10 seconds
                 setTimeout(() => {
                     if (!isConnected) {
@@ -445,23 +445,23 @@
                 enableVoice: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
                 maxHeight: '100%'
             });
-            
+
             // Make chatbot globally accessible for quick actions
             window.chatbot = chatbot;
-            
+
             // Handle chatbot events
             chatbot.on('message', async (data) => {
                 await sendMessage(data.text, data.context);
             });
-            
+
             chatbot.on('showProfile', () => {
                 showIntakeForm();
             });
-            
+
             chatbot.on('getRecommendations', async () => {
                 await getRecommendations();
             });
-            
+
             chatbot.on('settings', () => {
                 showSettings();
             });
@@ -472,7 +472,7 @@
                 chatbot.addBotResponse("I'm having trouble connecting right now. Please check your internet connection and try again.");
                 return;
             }
-            
+
             try {
                 // Send via WebSocket for real-time response
                 websocket.send(JSON.stringify({
@@ -481,7 +481,7 @@
                     text: text,
                     context: context
                 }));
-                
+
                 updateStatus('Sandy is thinking...');
             } catch (error) {
                 console.error('Error sending message:', error);
@@ -504,7 +504,7 @@
 
         function handleChatResponse(data) {
             updateStatus('Ready to chat!');
-            
+
             chatbot.addBotResponse(data.response, {
                 suggestions: data.suggestions?.map(s => s.text || s),
                 showActions: data.recommendedActions && data.recommendedActions.length > 0,
@@ -521,14 +521,14 @@
             try {
                 const response = await fetch(`/api/users/${currentUserId}/profile`);
                 let profile = null;
-                
+
                 if (response.ok) {
                     const data = await response.json();
                     profile = data.profile;
                 }
-                
+
                 const completionPercentage = profile?.intakeStatus?.completionPercentage || 0;
-                
+
                 if (completionPercentage < 100) {
                     chatbot.addBotResponse(
                         `Your profile is ${completionPercentage}% complete. Let me help you finish it so I can provide better personalized support. Would you like to continue with your intake form?`,
@@ -546,11 +546,11 @@
                         }
                     );
                 }
-                
+
                 if (profile) {
                     chatbot.updateProfile(profile);
                 }
-                
+
             } catch (error) {
                 console.error('Error fetching profile:', error);
                 chatbot.addBotResponse("I'm having trouble accessing your profile right now. Please try again in a moment.");
@@ -560,23 +560,23 @@
         async function getRecommendations() {
             try {
                 updateStatus('Generating recommendations...');
-                
+
                 const response = await fetch(`/api/users/${currentUserId}/recommendations`);
-                
+
                 if (!response.ok) {
                     throw new Error('Failed to get recommendations');
                 }
-                
+
                 const data = await response.json();
                 updateStatus('Ready to chat!');
-                
+
                 if (data.error) {
                     chatbot.addBotResponse(data.error);
                     return;
                 }
-                
+
                 let responseText = `Here are some personalized recommendations for you:\n\n`;
-                
+
                 if (data.recommendations && data.recommendations.length > 0) {
                     data.recommendations.forEach((rec, index) => {
                         responseText += `**${index + 1}. ${rec.category.toUpperCase()}**\n${rec.text}\n\n`;
@@ -584,12 +584,12 @@
                 } else {
                     responseText = "I'd love to give you personalized recommendations! To get started, I'll need to know more about you. Would you like to complete your profile first?";
                 }
-                
+
                 chatbot.addBotResponse(responseText, {
                     showActions: data.recommendations?.length > 0,
                     actions: ['Tell me more', 'Get different recommendations', 'Save these recommendations']
                 });
-                
+
             } catch (error) {
                 console.error('Error getting recommendations:', error);
                 updateStatus('Ready to chat!');
@@ -617,13 +617,13 @@
             dot.style.background = status === 'Connected' ? '#28a745' : '#dc3545';
         }
 
-        // Global functions for buttons
-        window.startChat = function() {
+        // Button event handlers
+        function startChat() {
             chatbot.sendMessage("Hello Sandy! I'd like to get started.");
             document.querySelector('.chat-container').scrollIntoView({ behavior: 'smooth' });
-        };
+        }
 
-        window.learnMore = function() {
+        function learnMore() {
             chatbot.addBotResponse(
                 `Hi! I'm Sandy, your personal support assistant. Here's what makes me special:
 
@@ -648,11 +648,20 @@ Ready to start? I'd love to learn about you and how I can best support your uniq
                     actions: ['Start my profile', 'Ask a question', 'Tell me about intake']
                 }
             );
-        };
+        }
+
+        // Attach event listeners to buttons
+        function attachButtonListeners() {
+            document.getElementById('start-chat-btn')?.addEventListener('click', startChat);
+            document.getElementById('learn-more-btn')?.addEventListener('click', learnMore);
+        }
 
         // Initialize app when page loads
-        document.addEventListener('DOMContentLoaded', initializeApp);
-        
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+            attachButtonListeners();
+        });
+
         // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && !isConnected) {
@@ -660,8 +669,3 @@ Ready to start? I'd love to learn about you and how I can best support your uniq
             }
         });
     </script>
-
-    <!-- Import chatbot module -->
-    <script type="module" src="./chatbot.js"></script>
-</body>
-</html>

@@ -50,4 +50,4 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Run the setup script and start the application
-CMD ["sh", "-c", "node scripts/setup.js && npm start"]
+CMD ["sh", "-c", "node scripts/setup.js && npm run dev"]
