@@ -32,11 +32,11 @@ Sandy is a compassionate AI-powered chatbot designed to provide personalized sup
 
 ### Prerequisites
 
-- **Node.js** (version 18.0.0 or higher)
-- **npm** or **yarn** package manager
+- **Docker** (version 20.0.0 or higher)
+- **Docker Compose** (version 2.0.0 or higher)
 - **OpenAI API Key** (for AI functionality)
 
-### Installation
+### Quick Start with Docker (Recommended)
 
 1. **Clone the repository**
    ```bash
@@ -44,36 +44,92 @@ Sandy is a compassionate AI-powered chatbot designed to provide personalized sup
    cd sandy-test
    ```
 
-2. **Install dependencies**
+2. **Set up Docker environment**
    ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
+   ./scripts/docker-dev.sh setup
    ```
    
-   Edit `.env` and add your configuration:
-   ```env
+   This will:
+   - Create the `.env` file from template
+   - Generate secure session secrets
+   - Create necessary directories
+   - Check Docker installation
+
+3. **Add your OpenAI API key**
+   ```bash
+   # Edit .env file
+   nano .env
+   
+   # Add your API key:
    OPENAI_API_KEY=your_openai_api_key_here
-   PORT=3000
-   NODE_ENV=development
    ```
 
-4. **Start the development server**
+4. **Build and start Sandy**
    ```bash
-   npm run dev
+   ./scripts/docker-dev.sh start
    ```
 
 5. **Open your browser**
    Navigate to `http://localhost:3000` to start using Sandy!
 
+### Alternative: Local Installation
+
+If you prefer to run without Docker:
+
+1. **Prerequisites**
+   - **Node.js** (version 18.0.0 or higher)
+   - **npm** or **yarn** package manager
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your OpenAI API key
+   ```
+
+4. **Start development server**
+   ```bash
+   npm run dev
+   ```
+
 ### Production Deployment
+
+#### Docker Production (Recommended)
+
+1. **Configure production environment**
+   ```bash
+   # Create production environment file
+   cp .env.example .env.production
+   
+   # Edit with production values
+   nano .env.production
+   ```
+
+2. **Deploy with Docker Compose**
+   ```bash
+   # Switch to production mode
+   ./scripts/docker-dev.sh prod
+   
+   # Start production stack
+   docker-compose -f docker-compose.prod.yml up -d
+   ```
+
+   This includes:
+   - Sandy chatbot application
+   - Nginx reverse proxy with SSL
+   - Redis for session storage
+   - Prometheus + Grafana monitoring
+   - Automated backups
+
+#### Traditional Production
 
 1. **Build for production**
    ```bash
-   npm run start
+   NODE_ENV=production npm start
    ```
 
 2. **Set production environment**
@@ -81,7 +137,138 @@ Sandy is a compassionate AI-powered chatbot designed to provide personalized sup
    NODE_ENV=production
    OPENAI_API_KEY=your_production_api_key
    DATABASE_PATH=./data/production.db
+   ALLOWED_ORIGINS=https://yourdomain.com
    ```
+
+## 🐳 Docker Usage
+
+### Development Commands
+
+Sandy includes a comprehensive Docker development script that makes container management easy:
+
+```bash
+# Setup and check environment
+./scripts/docker-dev.sh setup
+
+# Build the Docker image
+./scripts/docker-dev.sh build
+
+# Start development environment
+./scripts/docker-dev.sh start
+
+# Start in background (detached mode)
+./scripts/docker-dev.sh start --detach
+
+# View logs
+./scripts/docker-dev.sh logs
+
+# Follow logs in real-time
+./scripts/docker-dev.sh logs -f
+
+# Open shell in running container
+./scripts/docker-dev.sh shell
+
+# Check service status
+./scripts/docker-dev.sh status
+
+# Stop all services
+./scripts/docker-dev.sh stop
+
+# Restart services
+./scripts/docker-dev.sh restart
+
+# Clean up containers and volumes
+./scripts/docker-dev.sh clean
+
+# Create data backup
+./scripts/docker-dev.sh backup
+
+# Run tests in container
+./scripts/docker-dev.sh test
+```
+
+### NPM Docker Scripts
+
+For convenience, Docker commands are also available as npm scripts:
+
+```bash
+npm run docker:setup     # Setup environment
+npm run docker:build     # Build image
+npm run docker:start     # Start services
+npm run docker:stop      # Stop services
+npm run docker:logs      # View logs
+npm run docker:shell     # Open container shell
+npm run docker:status    # Check status
+npm run docker:clean     # Clean up
+npm run docker:backup    # Backup data
+```
+
+### Container Structure
+
+The Docker setup includes:
+
+- **sandy-chatbot**: Main Node.js application
+- **redis** (optional): Session storage and caching
+- **nginx** (production): Reverse proxy with SSL termination
+- **prometheus** (production): Metrics collection
+- **grafana** (production): Monitoring dashboards
+- **fluentd** (production): Log aggregation
+
+### Volume Management
+
+Data persistence is handled through Docker volumes:
+
+- `sandy_data`: User profiles and database
+- `sandy_logs`: Application logs
+- `redis_data`: Redis cache data (if enabled)
+
+### Environment Variables
+
+Docker containers use these key environment variables:
+
+```env
+# Core Settings
+NODE_ENV=development
+PORT=3000
+OPENAI_API_KEY=your_api_key_here
+
+# Database
+DATABASE_PATH=/app/data/users.db
+
+# AI Configuration
+AI_MODEL=gpt-3.5-turbo
+AI_TEMPERATURE=0.7
+AI_MAX_TOKENS=2000
+
+# Security
+ALLOWED_ORIGINS=http://localhost:3000
+SESSION_SECRET=auto_generated
+
+# Rate Limiting
+RATE_LIMIT_POINTS=50
+RATE_LIMIT_DURATION=60
+```
+
+### Production Docker Stack
+
+The production setup includes additional services for enterprise deployment:
+
+```yaml
+# docker-compose.prod.yml includes:
+services:
+  sandy-chatbot:     # Main application
+  redis:             # Session storage
+  nginx:             # Reverse proxy + SSL
+  prometheus:        # Metrics collection
+  grafana:           # Monitoring dashboard
+  fluentd:           # Log aggregation
+  backup:            # Automated backups
+```
+
+Access monitoring at:
+- **Application**: `https://yourdomain.com`
+- **Monitoring**: `https://yourdomain.com:3001` (Grafana)
+- **Metrics**: `https://yourdomain.com:9090` (Prometheus)
 
 ## 🏗️ Architecture
 
@@ -335,25 +522,78 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **Documentation**: Check this README and inline code comments
 - **Issues**: Report bugs and request features via GitHub issues
 - **Community**: Join our community discussions
+- **Docker Issues**: Use `./scripts/docker-dev.sh logs` for debugging
 
 ### Troubleshooting
 
-**Common Issues:**
+**Docker Issues:**
+
+1. **Container won't start**
+   ```bash
+   # Check Docker daemon
+   docker info
+   
+   # Check logs
+   ./scripts/docker-dev.sh logs
+   
+   # Rebuild image
+   ./scripts/docker-dev.sh build --no-cache
+   ```
+
+2. **Port already in use**
+   ```bash
+   # Check what's using port 3000
+   lsof -i :3000
+   
+   # Or change port in .env
+   PORT=3001
+   ```
+
+3. **Permission errors**
+   ```bash
+   # Fix volume permissions
+   sudo chown -R $USER:$USER data/
+   
+   # Or clean and restart
+   ./scripts/docker-dev.sh clean
+   ./scripts/docker-dev.sh start
+   ```
+
+**Application Issues:**
 
 1. **"Failed to connect" error**
-   - Check your internet connection
-   - Verify OPENAI_API_KEY is set correctly
-   - Ensure port 3000 is available
+   - Check container status: `./scripts/docker-dev.sh status`
+   - Verify OPENAI_API_KEY is set in .env
+   - Check container logs: `./scripts/docker-dev.sh logs`
 
 2. **AI responses not working**
    - Verify your OpenAI API key has credits
    - Check the AI_MODEL setting in .env
-   - Review server logs for error messages
+   - Review container logs for API errors
 
 3. **Database errors**
-   - Ensure the data/ directory exists and is writable
-   - Check DATABASE_PATH in your .env file
-   - Verify SQLite3 is properly installed
+   - Check if volume is mounted: `docker volume ls`
+   - Verify container permissions
+   - Restore from backup: `./scripts/docker-dev.sh restore`
+
+**Development Issues:**
+
+1. **Changes not reflected**
+   ```bash
+   # For development, use volume mounts
+   docker-compose -f docker-compose.yml up -d
+   
+   # Or rebuild if needed
+   ./scripts/docker-dev.sh restart --rebuild
+   ```
+
+2. **Memory issues**
+   ```bash
+   # Check container resource usage
+   docker stats
+   
+   # Increase memory limits in docker-compose.yml
+   ```
 
 ### Performance Optimization
 - Use production builds for deployment
@@ -369,6 +609,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [ ] Enhanced analytics dashboard
 - [ ] Integration with health APIs
 - [ ] Multi-language support
+- [ ] Kubernetes deployment support
+- [ ] Advanced monitoring and alerting
 
 ### Long Term (6+ months)
 - [ ] Machine learning insights
@@ -376,6 +618,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [ ] Healthcare provider portal
 - [ ] Advanced personalization AI
 - [ ] Telehealth integrations
+- [ ] Multi-cloud deployment options
+- [ ] Auto-scaling and load balancing
 
 ---
 

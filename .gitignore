@@ -181,10 +181,7 @@ secrets/
 *.csr
 ssl/
 
-# Docker
-.dockerignore
-Dockerfile
-docker-compose*.yml
+# Docker (keep Docker files but ignore runtime data)
 .docker/
 
 # Kubernetes
@@ -320,3 +317,21 @@ data/development.db
 logs/*.log
 public/assets/generated/
 src/generated/
+
+# Docker runtime files
+docker-compose.override.yml
+.env.docker
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+nginx/logs/
+backups/*.tar.gz
+backups/*.db
+monitoring/grafana/data/
+monitoring/prometheus/data/
+fluentd/logs/
+
+# Container volumes and data
+.volumes/
+container-data/
+docker-data/

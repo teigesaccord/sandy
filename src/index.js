@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 
@@ -34,7 +34,7 @@ const dbService = new DatabaseService(process.env.DATABASE_PATH || './data/users
 // Initialize Express app
 const app = express();
 const server = createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
 // Rate limiting
 const rateLimiter = new RateLimiterMemory({

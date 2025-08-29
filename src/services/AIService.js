@@ -1,26 +1,17 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { PromptTemplate } from '@langchain/core/prompts';
-import { LLMChain } from 'langchain/chains';
-import { ConversationSummaryBufferMemory } from 'langchain/memory';
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import OpenAI from 'openai';
 
 export class AIService {
   constructor(apiKey, options = {}) {
-    this.model = new ChatOpenAI({
-      openAIApiKey: apiKey,
-      modelName: options.modelName || 'gpt-3.5-turbo',
-      temperature: options.temperature || 0.7,
-      maxTokens: options.maxTokens || 2000,
+    this.openai = new OpenAI({
+      apiKey: apiKey
     });
-
-    this.memory = new ConversationSummaryBufferMemory({
-      llm: this.model,
-      maxTokenLimit: 2000,
-      returnMessages: true,
-    });
-
-    this.systemPrompts = this.initializeSystemPrompts();
+    
+    this.model = options.modelName || 'gpt-3.5-turbo';
+    this.temperature = options.temperature || 0.7;
+    this.maxTokens = options.maxTokens || 2000;
+    
     this.conversationHistory = new Map(); // Store per-user conversation history
+    this.systemPrompts = this.initializeSystemPrompts();
   }
 
   initializeSystemPrompts() {
@@ -84,54 +75,49 @@ Crisis indicators include: expressions of self-harm, severe depression, acute me
   async chat(userId, message, userProfile, context = {}) {
     try {
       // Get or create conversation memory for this user
-      let userMemory = this.conversationHistory.get(userId);
-      if (!userMemory) {
-        userMemory = new ConversationSummaryBufferMemory({
-          llm: this.model,
-          maxTokenLimit: 2000,
-          returnMessages: true,
-        });
-        this.conversationHistory.set(userId, userMemory);
+      let userHistory = this.conversationHistory.get(userId);
+      if (!userHistory) {
+        userHistory = [];
+        this.conversationHistory.set(userId, userHistory);
       }
 
       // Build personalized system message
       const systemMessage = this.buildSystemMessage(userProfile, context);
       
-      // Create the prompt with user context
-      const prompt = PromptTemplate.fromTemplate(`
-{system_message}
+      // Prepare messages for OpenAI
+      const messages = [
+        { role: 'system', content: systemMessage },
+        ...userHistory.slice(-10), // Keep last 10 messages for context
+        { role: 'user', content: message }
+      ];
 
-USER PROFILE CONTEXT:
-{profile_context}
-
-CONVERSATION CONTEXT:
-{conversation_context}
-
-USER MESSAGE: {user_message}
-
-Respond as Sandy, keeping your response helpful, personalized, and appropriate to this user's needs and preferences.`);
-
-      const chain = new LLMChain({
-        llm: this.model,
-        prompt: prompt,
-        memory: userMemory,
+      // Call OpenAI API
+      const completion = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: messages,
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
       });
 
-      const response = await chain.call({
-        system_message: systemMessage,
-        profile_context: this.formatProfileContext(userProfile),
-        conversation_context: context.conversationContext || "New conversation",
-        user_message: message,
-      });
+      const response = completion.choices[0].message.content;
 
       // Store interaction in user's history
-      await this.recordInteraction(userId, message, response.text, userProfile);
+      userHistory.push({ role: 'user', content: message });
+      userHistory.push({ role: 'assistant', content: response });
+
+      // Keep history manageable (last 20 messages)
+      if (userHistory.length > 20) {
+        userHistory.splice(0, userHistory.length - 20);
+      }
+
+      // Update user profile interaction stats
+      await this.recordInteraction(userId, message, response, userProfile);
 
       return {
-        response: response.text,
+        response: response,
         confidence: this.assessResponseConfidence(userProfile, message),
-        suggestions: await this.generateFollowUpSuggestions(userProfile, message, response.text),
-        recommendedActions: await this.extractRecommendedActions(response.text)
+        suggestions: await this.generateFollowUpSuggestions(userProfile, message, response),
+        recommendedActions: await this.extractRecommendedActions(response)
       };
 
     } catch (error) {
@@ -149,13 +135,12 @@ Respond as Sandy, keeping your response helpful, personalized, and appropriate t
     try {
       const context = userProfile.getRecommendationContext();
       
-      const prompt = PromptTemplate.fromTemplate(`
-${this.systemPrompts.recommendation}
+      const prompt = `${this.systemPrompts.recommendation}
 
 USER PROFILE:
-{profile_summary}
+${this.formatRecommendationContext(context)}
 
-SPECIFIC FOCUS AREA: {focus_area}
+SPECIFIC FOCUS AREA: ${specificArea || "overall wellness and daily living support"}
 
 Generate 3-5 personalized recommendations that are:
 1. Specific to their capabilities and limitations
@@ -163,20 +148,19 @@ Generate 3-5 personalized recommendations that are:
 3. Actionable and realistic
 4. Considerate of their energy levels and support network
 
-Format as a structured response with clear categories and explanations.`);
+Format as a structured response with clear categories and explanations.`;
 
-      const chain = new LLMChain({
-        llm: this.model,
-        prompt: prompt,
+      const completion = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
       });
 
-      const response = await chain.call({
-        profile_summary: this.formatRecommendationContext(context),
-        focus_area: specificArea || "overall wellness and daily living support"
-      });
+      const response = completion.choices[0].message.content;
 
       return {
-        recommendations: this.parseRecommendations(response.text),
+        recommendations: this.parseRecommendations(response),
         personalizedFor: userProfile.personalInfo.name || "User",
         generatedAt: new Date().toISOString(),
         focusArea: specificArea
@@ -194,12 +178,11 @@ Format as a structured response with clear categories and explanations.`);
   // Handle intake form conversations
   async processIntakeResponse(userId, response, currentSection, userProfile) {
     try {
-      const prompt = PromptTemplate.fromTemplate(`
-${this.systemPrompts.intake}
+      const prompt = `${this.systemPrompts.intake}
 
-CURRENT SECTION: {section_name}
-USER RESPONSE: {user_response}
-PROFILE PROGRESS: {profile_status}
+CURRENT SECTION: ${currentSection || "intake process"}
+USER RESPONSE: ${response}
+PROFILE PROGRESS: ${userProfile.intakeStatus?.completionPercentage || 0}% complete
 
 Respond with empathy and understanding. If the response reveals important information:
 1. Acknowledge their sharing
@@ -208,21 +191,19 @@ Respond with empathy and understanding. If the response reveals important inform
 4. Explain how this information helps provide better support
 5. Transition naturally to the next topic if appropriate
 
-Keep the tone conversational and supportive.`);
+Keep the tone conversational and supportive.`;
 
-      const chain = new LLMChain({
-        llm: this.model,
-        prompt: prompt,
+      const completion = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: this.temperature,
+        max_tokens: this.maxTokens,
       });
 
-      const aiResponse = await chain.call({
-        section_name: currentSection || "intake process",
-        user_response: response,
-        profile_status: `${userProfile.intakeStatus.completionPercentage}% complete`
-      });
+      const aiResponse = completion.choices[0].message.content;
 
       return {
-        response: aiResponse.text,
+        response: aiResponse,
         empathyLevel: this.detectEmpathyNeeds(response),
         followUpQuestions: await this.generateAdaptiveFollowUps(response, currentSection, userProfile)
       };
@@ -259,22 +240,22 @@ Keep the tone conversational and supportive.`);
       }
 
       // Add support type preferences
-      if (prefs.supportType.length > 0) {
+      if (prefs.supportType && prefs.supportType.length > 0) {
         systemMessage += `\n\nPREFERRED SUPPORT TYPES: Focus on ${prefs.supportType.join(', ')} support.`;
       }
 
       // Add physical capability awareness
-      if (userProfile.physicalNeeds.mobilityLevel) {
+      if (userProfile.physicalNeeds?.mobilityLevel) {
         systemMessage += `\n\nPHYSICAL AWARENESS: User has ${userProfile.physicalNeeds.mobilityLevel} mobility. Adapt all suggestions accordingly.`;
       }
 
       // Add energy consideration
-      if (userProfile.energyLevels.peakEnergyTime) {
+      if (userProfile.energyLevels?.peakEnergyTime) {
         systemMessage += `\n\nENERGY PATTERNS: User's peak energy is ${userProfile.energyLevels.peakEnergyTime}. Consider this for activity timing.`;
       }
 
       // Add goal focus
-      if (userProfile.preferences.goalPriority) {
+      if (userProfile.preferences?.goalPriority) {
         systemMessage += `\n\nCURRENT FOCUS: User's main priority is ${userProfile.preferences.goalPriority}.`;
       }
     }
@@ -294,55 +275,54 @@ Keep the tone conversational and supportive.`);
     const context = userProfile.getPersonalizationContext();
     
     return `
-Physical Status: ${context.physicalCapabilities.mobility} mobility, ${context.physicalCapabilities.exercise} exercise capability
-Current Pain Level: ${context.physicalCapabilities.pain?.current || 'Not specified'}/10
-Energy Patterns: Peak energy ${context.energyProfile.peakTime}, Morning: ${context.energyProfile.patterns?.morningEnergy || 'Unknown'}/10
-Communication Preference: ${context.communicationPrefs.style}
-Support Types: ${context.communicationPrefs.supportType?.join(', ') || 'Not specified'}
-Main Priority: ${context.currentGoals.priority}
-Current Goals: ${context.currentGoals.shortTerm?.join(', ') || 'None specified'}
-Support Network: Family support is ${context.supportLevel.family}, Professional support: ${context.supportLevel.professional ? 'Yes' : 'No'}
-Profile Completeness: ${userProfile.intakeStatus.completionPercentage}%`;
+Physical Status: ${context.physicalCapabilities?.mobility || 'Unknown'} mobility, ${context.physicalCapabilities?.exercise || 'Unknown'} exercise capability
+Current Pain Level: ${context.physicalCapabilities?.pain?.current || 'Not specified'}/10
+Energy Patterns: Peak energy ${context.energyProfile?.peakTime || 'Unknown'}, Morning: ${context.energyProfile?.patterns?.morningEnergy || 'Unknown'}/10
+Communication Preference: ${context.communicationPrefs?.style || 'Unknown'}
+Support Types: ${context.communicationPrefs?.supportType?.join(', ') || 'Not specified'}
+Main Priority: ${context.currentGoals?.priority || 'Unknown'}
+Current Goals: ${context.currentGoals?.shortTerm?.join(', ') || 'None specified'}
+Support Network: Family support is ${context.supportLevel?.family || 'unknown'}, Professional support: ${context.supportLevel?.professional ? 'Yes' : 'No'}
+Profile Completeness: ${userProfile.intakeStatus?.completionPercentage || 0}%`;
   }
 
   // Format context for recommendations
   formatRecommendationContext(context) {
     return `
 PHYSICAL CAPABILITIES:
-- Mobility: ${context.physicalCapabilities.mobility}
-- Exercise Level: ${context.physicalCapabilities.exercise}
-- Pain Level: ${context.physicalCapabilities.pain?.current}/10
-- Chronic Conditions: ${context.physicalCapabilities.conditions?.join(', ') || 'None listed'}
+- Mobility: ${context.physicalCapabilities?.mobility || 'Unknown'}
+- Exercise Level: ${context.physicalCapabilities?.exercise || 'Unknown'}
+- Pain Level: ${context.physicalCapabilities?.pain?.current || 'Unknown'}/10
+- Chronic Conditions: ${context.physicalCapabilities?.conditions?.join(', ') || 'None listed'}
 
 ENERGY PROFILE:
-- Peak Energy Time: ${context.energyProfile.peakTime}
-- Morning Energy: ${context.energyProfile.patterns?.morningEnergy}/10
-- Fatigue Triggers: ${context.energyProfile.fatigueTriggers?.join(', ') || 'Not specified'}
+- Peak Energy Time: ${context.energyProfile?.peakTime || 'Unknown'}
+- Morning Energy: ${context.energyProfile?.patterns?.morningEnergy || 'Unknown'}/10
+- Fatigue Triggers: ${context.energyProfile?.fatigueTriggers?.join(', ') || 'Not specified'}
 
 PREFERENCES:
-- Communication Style: ${context.communicationPrefs.style}
-- Support Types: ${context.communicationPrefs.supportType?.join(', ')}
-- Reminder Frequency: ${context.communicationPrefs.reminderFreq}
+- Communication Style: ${context.communicationPrefs?.style || 'Unknown'}
+- Support Types: ${context.communicationPrefs?.supportType?.join(', ') || 'Unknown'}
+- Reminder Frequency: ${context.communicationPrefs?.reminderFreq || 'Unknown'}
 
 GOALS & PRIORITIES:
-- Main Priority: ${context.currentGoals.priority}
-- Short-term Goals: ${context.currentGoals.shortTerm?.join(', ')}
-- Daily Goals: ${context.currentGoals.daily?.join(', ')}
+- Main Priority: ${context.currentGoals?.priority || 'Unknown'}
+- Short-term Goals: ${context.currentGoals?.shortTerm?.join(', ') || 'None specified'}
+- Daily Goals: ${context.currentGoals?.daily?.join(', ') || 'None specified'}
 
 SUPPORT NETWORK:
-- Family Support: ${context.supportLevel.family}
-- Professional Support Available: ${context.supportLevel.professional ? 'Yes' : 'No'}`;
+- Family Support: ${context.supportLevel?.family || 'unknown'}
+- Professional Support Available: ${context.supportLevel?.professional ? 'Yes' : 'No'}`;
   }
 
   // Record user interactions for learning
   async recordInteraction(userId, userMessage, aiResponse, userProfile) {
     try {
       // Update interaction history in user profile
-      userProfile.interactionHistory.totalInteractions += 1;
-      userProfile.interactionHistory.lastInteraction = new Date().toISOString();
-
-      // You could also store this in a database for analytics
-      // await this.storeInteractionInDB(userId, userMessage, aiResponse);
+      if (userProfile.interactionHistory) {
+        userProfile.interactionHistory.totalInteractions += 1;
+        userProfile.interactionHistory.lastInteraction = new Date().toISOString();
+      }
     } catch (error) {
       console.error('Failed to record interaction:', error);
     }
@@ -353,11 +333,11 @@ SUPPORT NETWORK:
     let confidence = 0.5; // Base confidence
 
     // Increase confidence based on profile completeness
-    const completeness = userProfile.intakeStatus.completionPercentage || 0;
+    const completeness = userProfile.intakeStatus?.completionPercentage || 0;
     confidence += (completeness / 100) * 0.3;
 
     // Increase confidence based on interaction history
-    const interactions = userProfile.interactionHistory.totalInteractions || 0;
+    const interactions = userProfile.interactionHistory?.totalInteractions || 0;
     confidence += Math.min(interactions / 50, 0.2);
 
     // Adjust based on message complexity
@@ -370,10 +350,10 @@ SUPPORT NETWORK:
   // Generate follow-up suggestions
   async generateFollowUpSuggestions(userProfile, userMessage, aiResponse) {
     const suggestions = [];
-    const context = userProfile.getPersonalizationContext();
+    const context = userProfile.getPersonalizationContext?.() || {};
 
     // Suggest profile completion if low
-    if (userProfile.intakeStatus.completionPercentage < 70) {
+    if ((userProfile.intakeStatus?.completionPercentage || 0) < 70) {
       suggestions.push({
         type: "profile_completion",
         text: "Would you like to complete more of your profile for more personalized support?",
@@ -382,7 +362,7 @@ SUPPORT NETWORK:
     }
 
     // Suggest goal setting if no goals
-    if (context.currentGoals.shortTerm?.length === 0) {
+    if (!context.currentGoals?.shortTerm || context.currentGoals.shortTerm.length === 0) {
       suggestions.push({
         type: "goal_setting",
         text: "Would you like help setting some achievable goals?",
@@ -391,7 +371,7 @@ SUPPORT NETWORK:
     }
 
     // Suggest specific support based on high pain
-    if (context.physicalCapabilities.pain?.current > 6) {
+    if (context.physicalCapabilities?.pain?.current > 6) {
       suggestions.push({
         type: "pain_support",
         text: "I notice you're experiencing significant pain. Would you like some gentle pain management strategies?",
@@ -400,7 +380,7 @@ SUPPORT NETWORK:
     }
 
     // Suggest energy management for low energy
-    if (context.energyProfile.patterns?.morningEnergy < 4) {
+    if (context.energyProfile?.patterns?.morningEnergy < 4) {
       suggestions.push({
         type: "energy_support",
         text: "Would you like some tips for managing low energy levels?",
@@ -574,14 +554,30 @@ SUPPORT NETWORK:
 
   // Get conversation summary for a user
   async getConversationSummary(userId) {
-    const userMemory = this.conversationHistory.get(userId);
-    if (!userMemory) return "No conversation history available";
+    const userHistory = this.conversationHistory.get(userId);
+    if (!userHistory || userHistory.length === 0) {
+      return "No conversation history available";
+    }
 
     try {
-      return await userMemory.predictNewSummary(
-        userMemory.movingSummary,
-        userMemory.chatMemory.messages
-      );
+      const conversationText = userHistory
+        .map(msg => `${msg.role}: ${msg.content}`)
+        .join('\n');
+
+      const prompt = `Please provide a brief summary of this conversation between a user and Sandy, a support assistant:
+
+${conversationText}
+
+Summary:`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 200,
+      });
+
+      return completion.choices[0].message.content;
     } catch (error) {
       console.error('Failed to generate conversation summary:', error);
       return "Unable to generate conversation summary";

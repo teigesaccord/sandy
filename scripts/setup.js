@@ -127,8 +127,8 @@ async function checkDependencies() {
     
     // Check for critical dependencies
     const criticalDeps = [
-      'langchain',
-      '@langchain/openai',
+      'openai',
+      'rate-limiter-flexible',
       'express',
       'sqlite3',
       'ws'
