@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAIService, getDBService, checkRateLimit, handleApiError, getCorsHeaders, validateUserId, validateMessage } from '../../../../../lib/services';
+import { getAIService, checkRateLimit, handleApiError, getCorsHeaders, validateMessage } from '../../../../../lib/services';
 import { UserProfile } from '../../../../../models/UserProfile';
+import { PostgreSQLService } from '../../../../../services/PostgreSQLService';
+import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
 
-export async function POST(
+let dbService: PostgreSQLService | null = null;
+
+function getDBService(): PostgreSQLService {
+  if (!dbService) {
+    dbService = new PostgreSQLService();
+  }
+  return dbService;
+}
+
+export const POST = requireAuth(async (
   request: NextRequest,
   { params }: { params: { userId: string } }
-) {
+) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only chat as themselves
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
@@ -60,7 +73,8 @@ export async function POST(
 
     // Get services
     const aiService = await getAIService();
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
 
     // Get or create user profile
     let profile = await dbService.getUserProfile(userId);
@@ -81,25 +95,9 @@ export async function POST(
       message: message.substring(0, 100), // First 100 chars for privacy
       responseLength: response.response.length,
       intent: response.intent
-    }, true);
-
-    // Update user profile with conversation history
-    profile.addConversationMessage({
-      id: `${Date.now()}_user`,
-      userId,
-      role: 'user',
-      content: message,
-      timestamp: new Date(),
-      metadata: { context: JSON.stringify(context) }
     });
 
-    profile.addConversationMessage({
-      id: `${Date.now()}_assistant`,
-      userId,
-      role: 'assistant',
-      content: response.response,
-      timestamp: new Date()
-    });
+    // Conversation history is automatically managed by the database service
 
     // Save updated profile
     await dbService.saveUserProfile(userId, profile);
@@ -145,20 +143,22 @@ export async function POST(
       }
     );
   }
-}
+});
 
-export async function GET(
+export const GET = requireAuth(async (
   request: NextRequest,
   { params }: { params: { userId: string } }
-) {
+) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only access their own chat history
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
@@ -182,22 +182,16 @@ export async function GET(
       );
     }
 
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
     const url = new URL(request.url);
-    const limit = parseInt(url.searchParams.get('limit') || '20');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
-
-    const conversationHistory = await dbService.getConversationHistory(userId, limit, offset);
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    
+    // Get conversation history
+    const history = await dbService.getConversationHistory(userId, limit);
 
     return NextResponse.json(
-      {
-        conversations: conversationHistory,
-        pagination: {
-          limit,
-          offset,
-          hasMore: conversationHistory.length === limit
-        }
-      },
+      { history },
       { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
     );
 
@@ -208,25 +202,27 @@ export async function GET(
       { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
     );
   }
-}
+});
 
-export async function DELETE(
+export const DELETE = requireAuth(async (
   request: NextRequest,
   { params }: { params: { userId: string } }
-) {
+) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only clear their own chat history
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
     // Rate limiting
-    const rateLimitResult = checkRateLimit(`chat_delete_${userId}`);
+    const rateLimitResult = checkRateLimit(`chat_clear_${userId}`);
     if (!rateLimitResult.success) {
       return NextResponse.json(
         {
@@ -246,7 +242,8 @@ export async function DELETE(
     }
 
     const aiService = await getAIService();
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
 
     // Clear conversation history in AI service
     aiService.clearUserHistory(userId);
@@ -266,7 +263,7 @@ export async function DELETE(
       { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
     );
   }
-}
+});
 
 export async function OPTIONS(request: NextRequest) {
   return NextResponse.json(

@@ -6,35 +6,33 @@ import { IntakeForm } from '../components/IntakeForm';
 import { RecommendationsList } from '../components/RecommendationsList';
 import { UserProfileCard } from '../components/UserProfileCard';
 import { StatusIndicator } from '../components/StatusIndicator';
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { useAuth } from '../components/auth/AuthContext';
 
-export default function HomePage() {
-  const [userId, setUserId] = useState<string>('');
+function AuthenticatedHomePage() {
+  const { user, logout } = useAuth();
   const [currentView, setCurrentView] = useState<'welcome' | 'intake' | 'chat' | 'recommendations'>('welcome');
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Generate or retrieve user ID
+  // Load user profile when component mounts
   useEffect(() => {
-    let storedUserId = localStorage.getItem('sandy_user_id');
-    if (!storedUserId) {
-      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('sandy_user_id', storedUserId);
-    }
-    setUserId(storedUserId);
-    setIsConnected(true);
-  }, []);
-
-  // Load user profile
-  useEffect(() => {
-    if (userId) {
+    if (user) {
       loadUserProfile();
     }
-  }, [userId]);
+  }, [user]);
 
   const loadUserProfile = async () => {
+    if (!user) return;
+    
     try {
-      const response = await fetch(`/api/users/${userId}/profile`);
+      const response = await fetch(`/api/users/${user.id}/profile`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setUserProfile(data.profile);
@@ -42,6 +40,12 @@ export default function HomePage() {
     } catch (error) {
       console.error('Failed to load user profile:', error);
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setUserProfile(null);
+    setCurrentView('welcome');
   };
 
   const handleIntakeComplete = async (profile: any) => {
@@ -65,12 +69,12 @@ export default function HomePage() {
     setCurrentView('recommendations');
   };
 
-  if (!userId) {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="spinner mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Initializing Sandy...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -83,29 +87,43 @@ export default function HomePage() {
         <div className="relative overflow-hidden">
           <div className="container py-16 md:py-24">
             <div className="max-w-4xl mx-auto text-center">
+              <div className="flex items-center justify-between mb-6">
+                <div></div>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">
+                    Welcome, {user.firstName || user.email}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
               <h1 className="text-4xl md:text-6xl font-bold mb-6">
                 <span className="text-gradient">Meet Sandy</span>
               </h1>
               <p className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed">
-                Your compassionate AI assistant, here to provide personalized support 
+                Your compassionate AI assistant, here to provide personalized support
                 and guidance for life's daily challenges.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                <button 
+                <button
                   onClick={handleStartChat}
                   className="btn btn-primary btn-lg"
                   disabled={isLoading}
                 >
                   {userProfile?.intakeStatus?.completionPercentage > 50 ? 'Continue Chatting' : 'Get Started'}
                 </button>
-                <button 
+                <button
                   onClick={handleStartIntake}
                   className="btn btn-outline btn-lg"
                 >
                   Complete Profile
                 </button>
-                <button 
+                <button
                   onClick={handleViewRecommendations}
                   className="btn btn-secondary btn-lg"
                   disabled={!userProfile}
@@ -141,7 +159,7 @@ export default function HomePage() {
                   Tailored guidance based on your unique needs, preferences, and goals.
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
                   <span className="text-2xl">🤝</span>
@@ -151,7 +169,7 @@ export default function HomePage() {
                   Understanding and empathetic responses that acknowledge your challenges.
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
                   <span className="text-2xl">🚀</span>
@@ -176,8 +194,8 @@ export default function HomePage() {
                 Help Sandy provide better support by sharing a bit about yourself.
               </p>
             </div>
-            <IntakeForm 
-              userId={userId}
+            <IntakeForm
+              userId={user.id}
               onComplete={handleIntakeComplete}
               onBack={() => setCurrentView('welcome')}
             />
@@ -197,13 +215,13 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => setCurrentView('welcome')}
                   className="btn btn-ghost btn-sm"
                 >
                   Back to Home
                 </button>
-                <button 
+                <button
                   onClick={() => setCurrentView('recommendations')}
                   className="btn btn-secondary btn-sm"
                   disabled={!userProfile}
@@ -212,7 +230,7 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-            <ChatComponent userId={userId} />
+            <ChatComponent userId={user.id} />
           </div>
         </div>
       )}
@@ -229,13 +247,13 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => setCurrentView('welcome')}
                   className="btn btn-ghost btn-sm"
                 >
                   Back to Home
                 </button>
-                <button 
+                <button
                   onClick={() => setCurrentView('chat')}
                   className="btn btn-primary btn-sm"
                 >
@@ -243,17 +261,17 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="grid lg:grid-cols-4 gap-6">
               <div className="lg:col-span-1">
-                <UserProfileCard 
-                  userId={userId} 
+                <UserProfileCard
+                  userId={user.id}
                   profile={userProfile}
                   onUpdateProfile={() => loadUserProfile()}
                 />
               </div>
               <div className="lg:col-span-3">
-                <RecommendationsList userId={userId} />
+                <RecommendationsList userId={user.id} />
               </div>
             </div>
           </div>
@@ -272,5 +290,13 @@ export default function HomePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <ProtectedRoute>
+      <AuthenticatedHomePage />
+    </ProtectedRoute>
   );
 }

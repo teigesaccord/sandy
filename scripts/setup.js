@@ -130,7 +130,9 @@ async function checkDependencies() {
       'openai',
       'rate-limiter-flexible',
       'express',
-      'sqlite3',
+      'pg',
+      'bcryptjs',
+      'jsonwebtoken',
       'ws'
     ];
     
@@ -148,33 +150,28 @@ async function checkDependencies() {
 }
 
 async function initializeDatabase() {
-  console.log('🗄️  Initializing database...');
+  console.log('🗄️  Initializing PostgreSQL database...');
   
-  const dataDir = path.join(__dirname, '..', 'data');
-  const dbPath = path.join(dataDir, 'users.db');
+  const dbUrl = process.env.DATABASE_URL || 'postgresql://sandy_user:sandy_password@localhost:5432/sandy_chatbot';
   
   try {
-    // Check if database exists
-    await fs.access(dbPath);
-    console.log('✅ Database file exists');
-  } catch {
-    console.log('📝 Database will be created on first run');
-  }
-  
-  // Create a simple health check for the database
-  try {
-    // Import and test database service
-    const { DatabaseService } = await import('../src/services/DatabaseService.js');
-    const dbService = new DatabaseService(dbPath);
+    // Import and test PostgreSQL database service
+    const { PostgreSQLService } = await import('../src/services/PostgreSQLService.js');
+    const dbService = new PostgreSQLService(dbUrl);
+    
+    console.log('🔗 Testing database connection...');
     await dbService.initialize();
+    
+    console.log('✅ Database connection test passed');
+    console.log('📊 Database tables created/verified');
+    
     await dbService.close();
-    console.log('✅ Database initialization test passed');
+    console.log('✅ PostgreSQL database initialization completed');
   } catch (error) {
-    console.log('⚠️  Database test failed - will retry on first run');
+    console.log('⚠️  Database test failed - please check PostgreSQL connection');
     console.log(`   Error: ${error.message}`);
+    console.log('   Make sure PostgreSQL is running and DATABASE_URL is correct');
   }
-  
-  console.log();
 }
 
 async function runHealthCheck() {

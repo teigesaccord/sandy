@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDBService, checkRateLimit, handleApiError, getCorsHeaders, validateUserId } from '../../../../../lib/services';
+import { checkRateLimit, handleApiError, getCorsHeaders } from '../../../../../lib/services';
 import { UserProfile } from '../../../../../models/UserProfile';
+import { PostgreSQLService } from '../../../../../services/PostgreSQLService';
+import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+let dbService: PostgreSQLService | null = null;
+
+function getDBService(): PostgreSQLService {
+  if (!dbService) {
+    dbService = new PostgreSQLService();
+  }
+  return dbService;
+}
+
+export const GET = requireAuth(async (request: NextRequest, { params }: { params: { userId: string } }) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only access their own profile
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
@@ -37,7 +47,8 @@ export async function GET(
       );
     }
 
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
     const profile = await dbService.getUserProfile(userId);
 
     if (!profile) {
@@ -59,20 +70,19 @@ export async function GET(
       { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
     );
   }
-}
+});
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export const POST = requireAuth(async (request: NextRequest, { params }: { params: { userId: string } }) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only update their own profile
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
@@ -107,7 +117,8 @@ export async function POST(
       );
     }
 
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
     
     // Get existing profile or create new one
     let profile = await dbService.getUserProfile(userId);
@@ -129,6 +140,11 @@ export async function POST(
     // Save profile
     await dbService.saveUserProfile(userId, profile);
 
+    // Record profile update interaction
+    await dbService.recordInteraction(userId, 'profile_update', {
+      timestamp: new Date().toISOString()
+    });
+
     return NextResponse.json(
       { profile: profile.toJSON() },
       { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
@@ -141,28 +157,21 @@ export async function POST(
       { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
     );
   }
-}
+});
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
-  // PUT has the same logic as POST for profile updates
-  return POST(request, { params });
-}
+export const PUT = POST; // PUT has the same logic as POST for profile updates
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export const DELETE = requireAuth(async (request: NextRequest, { params }: { params: { userId: string } }) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only delete their own profile
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
@@ -186,7 +195,8 @@ export async function DELETE(
       );
     }
 
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
     const success = await dbService.deleteUserProfile(userId);
 
     if (!success) {
@@ -208,7 +218,7 @@ export async function DELETE(
       { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
     );
   }
-}
+});
 
 export async function OPTIONS(request: NextRequest) {
   return NextResponse.json(

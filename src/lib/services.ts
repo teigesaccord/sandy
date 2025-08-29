@@ -1,18 +1,18 @@
 import { AIService } from '../services/AIService';
-import { DatabaseService } from '../services/DatabaseService';
+import { PostgreSQLService } from '../services/PostgreSQLService';
 import { IntakeFormService } from '../services/IntakeFormService';
 import type { AppConfig } from '../types';
 
 // Global service instances
 let aiService: AIService | null = null;
-let dbService: DatabaseService | null = null;
+let dbService: PostgreSQLService | null = null;
 let intakeService: IntakeFormService | null = null;
 
 // Configuration
 const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000'),
   nodeEnv: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
-  databasePath: process.env.DATABASE_PATH || './data/users.db',
+  databasePath: process.env.DATABASE_URL || 'postgresql://sandy_user:sandy_password@localhost:5432/sandy_chatbot',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000'],
   aiConfig: {
@@ -29,7 +29,7 @@ const config: AppConfig = {
 // Initialize services
 export async function initializeServices(): Promise<{
   aiService: AIService;
-  dbService: DatabaseService;
+  dbService: PostgreSQLService;
   intakeService: IntakeFormService;
 }> {
   try {
@@ -43,7 +43,7 @@ export async function initializeServices(): Promise<{
 
     // Initialize Database Service
     if (!dbService) {
-      dbService = new DatabaseService(config.databasePath);
+      dbService = new PostgreSQLService(config.databasePath);
       await dbService.initialize();
     }
 
@@ -72,7 +72,7 @@ export async function getAIService(): Promise<AIService> {
   return aiService;
 }
 
-export async function getDBService(): Promise<DatabaseService> {
+export async function getDBService(): Promise<PostgreSQLService> {
   if (!dbService) {
     const services = await initializeServices();
     return services.dbService;

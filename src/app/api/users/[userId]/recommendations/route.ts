@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAIService, getDBService, checkRateLimit, handleApiError, getCorsHeaders, validateUserId } from '../../../../../lib/services';
+import { getAIService, checkRateLimit, handleApiError, getCorsHeaders } from '../../../../../lib/services';
+import { PostgreSQLService } from '../../../../../services/PostgreSQLService';
+import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
 
-export async function GET(
+let dbService: PostgreSQLService | null = null;
+
+function getDBService(): PostgreSQLService {
+  if (!dbService) {
+    dbService = new PostgreSQLService();
+  }
+  return dbService;
+}
+
+export const GET = requireAuth(async (
   request: NextRequest,
   { params }: { params: { userId: string } }
-) {
+) => {
   try {
+    const authRequest = request as AuthenticatedRequest;
+    const user = authRequest.user!;
     const { userId } = params;
 
-    // Validate user ID
-    if (!validateUserId(userId)) {
+    // Users can only access their own recommendations
+    if (userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Access denied' },
+        { status: 403, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
@@ -42,7 +55,8 @@ export async function GET(
 
     // Get services
     const aiService = await getAIService();
-    const dbService = await getDBService();
+    const dbService = getDBService();
+    await dbService.initialize();
 
     // Get user profile
     const profile = await dbService.getUserProfile(userId);
@@ -86,10 +100,11 @@ export async function GET(
     }
 
     // Record interaction
-    await dbService.recordInteraction(userId, 'recommendation', {
+    // Record recommendation interaction
+    await dbService.recordInteraction(userId, 'recommendation_request', {
       area: area || 'general',
       recommendationCount: result.recommendations.length
-    }, true);
+    });
 
     return NextResponse.json(
       {
@@ -155,7 +170,7 @@ export async function GET(
       }
     );
   }
-}
+});
 
 export async function OPTIONS(request: NextRequest) {
   return NextResponse.json(

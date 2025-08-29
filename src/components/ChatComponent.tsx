@@ -18,13 +18,14 @@ interface ChatMessage {
 }
 
 export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
+  console.log(userId)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -59,7 +60,7 @@ export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
           content: conv.messageText,
           timestamp: new Date(conv.timestamp)
         })).reverse(); // Reverse to show oldest first
-        
+
         setMessages(historyMessages);
       }
     } catch (error) {
@@ -136,7 +137,7 @@ export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
 
     } catch (error: any) {
       console.error('Chat error:', error);
-      
+
       // Don't show error if request was aborted
       if (error.name === 'AbortError') {
         return;
@@ -184,7 +185,7 @@ export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
         setMessages([]);
         setSuggestions([]);
         setError(null);
-        
+
         // Add welcome message
         const welcomeMessage: ChatMessage = {
           id: 'welcome_new',
