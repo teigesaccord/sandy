@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sandy - Your Personal Support Assistant</title>
+    <meta name="description" content="Sandy is your compassionate AI support assistant, providing personalized recommendations and guidance for your unique needs.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23007bff'/%3E%3Ctext x='50' y='65' font-family='Arial' font-size='40' font-weight='bold' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
+    
+    <!-- Preconnect for better performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .hero-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero-section h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .hero-section p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #666;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .feature {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .feature p {
+            font-size: 0.95rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            height: 700px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: #667eea;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .user-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .action-btn.secondary {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .action-btn.secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Loading animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .hero-section {
+                padding: 30px;
+            }
+
+            .hero-section h1 {
+                font-size: 2.5rem;
+            }
+
+            .chat-container {
+                height: 600px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .hero-section {
+                padding: 20px;
+            }
+
+            .hero-section h1 {
+                font-size: 2rem;
+            }
+
+            .hero-section p {
+                font-size: 1rem;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+
+            .user-actions {
+                flex-direction: column;
+            }
+
+            .chat-container {
+                height: 500px;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero-section, .chat-container {
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .hero-section {
+                background: white;
+                border: 2px solid #000;
+            }
+
+            .feature {
+                background: white;
+                border: 1px solid #000;
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1>Meet Sandy</h1>
+            <p>Your compassionate AI support assistant designed to understand your unique physical needs, energy levels, and preferences. Get personalized recommendations delivered in plain language with easy navigation.</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>🎯 Personalized Support</h3>
+                    <p>Tailored recommendations based on your individual physical capabilities, energy patterns, and personal goals.</p>
+                </div>
+                
+                <div class="feature">
+                    <h3>🧠 Intelligent Conversations</h3>
+                    <p>Natural, empathetic conversations powered by advanced AI that learns and adapts to your communication style.</p>
+                </div>
+                
+                <div class="feature">
+                    <h3>📋 Smart Intake Forms</h3>
+                    <p>Dynamic questionnaires that adapt based on your responses, creating a comprehensive support profile.</p>
+                </div>
+                
+                <div class="feature">
+                    <h3>💡 Actionable Insights</h3>
+                    <p>Clear, practical recommendations you can implement today, with gentle guidance for long-term goals.</p>
+                </div>
+            </div>
+            
+            <div class="user-actions">
+                <button class="action-btn" onclick="startChat()">Start Chatting</button>
+                <button class="action-btn secondary" onclick="learnMore()">Learn More</button>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-container">
+            <div class="status-bar">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span id="status-text">Sandy is ready to help</span>
+                </div>
+                <div class="connection-info">
+                    <span id="connection-status">Connected</span>
+                </div>
+            </div>
+            
+            <div class="loading active" id="loading">
+                <div class="spinner"></div>
+                <p>Initializing Sandy...</p>
+            </div>
+            
+            <!-- Chat interface will be inserted here -->
+            <div id="chatbot-container" style="flex: 1; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Include our chatbot component -->
+    <script type="module">
+        import { Chatbot } from './chatbot.js';
+        
+        let chatbot = null;
+        let currentUserId = null;
+        let isConnected = false;
+        let websocket = null;
+
+        // Initialize the application
+        async function initializeApp() {
+            try {
+                // Generate or retrieve user ID
+                currentUserId = localStorage.getItem('sandy_user_id') || generateUserId();
+                localStorage.setItem('sandy_user_id', currentUserId);
+                
+                // Initialize WebSocket connection
+                await initializeWebSocket();
+                
+                // Initialize chatbot
+                initializeChatbot();
+                
+                // Hide loading, show chat
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('chatbot-container').style.display = 'flex';
+                
+                updateStatus('Ready to chat!');
+                
+            } catch (error) {
+                console.error('Failed to initialize app:', error);
+                updateStatus('Connection failed. Please refresh the page.');
+                document.getElementById('loading').innerHTML = `
+                    <p style="color: #dc3545;">Failed to connect. Please check your internet connection and refresh the page.</p>
+                `;
+            }
+        }
+
+        function generateUserId() {
+            return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        async function initializeWebSocket() {
+            return new Promise((resolve, reject) => {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}`;
+                
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = () => {
+                    isConnected = true;
+                    updateConnectionStatus('Connected');
+                    resolve();
+                };
+                
+                websocket.onmessage = (event) => {
+                    handleWebSocketMessage(JSON.parse(event.data));
+                };
+                
+                websocket.onclose = () => {
+                    isConnected = false;
+                    updateConnectionStatus('Disconnected');
+                    // Attempt to reconnect after 3 seconds
+                    setTimeout(() => {
+                        if (!isConnected) {
+                            initializeWebSocket();
+                        }
+                    }, 3000);
+                };
+                
+                websocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    reject(error);
+                };
+                
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    if (!isConnected) {
+                        reject(new Error('WebSocket connection timeout'));
+                    }
+                }, 10000);
+            });
+        }
+
+        function initializeChatbot() {
+            chatbot = new Chatbot('#chatbot-container', {
+                theme: 'light',
+                primaryColor: '#667eea',
+                accentColor: '#28a745',
+                enableVoice: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
+                maxHeight: '100%'
+            });
+            
+            // Make chatbot globally accessible for quick actions
+            window.chatbot = chatbot;
+            
+            // Handle chatbot events
+            chatbot.on('message', async (data) => {
+                await sendMessage(data.text, data.context);
+            });
+            
+            chatbot.on('showProfile', () => {
+                showIntakeForm();
+            });
+            
+            chatbot.on('getRecommendations', async () => {
+                await getRecommendations();
+            });
+            
+            chatbot.on('settings', () => {
+                showSettings();
+            });
+        }
+
+        async function sendMessage(text, context = {}) {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                chatbot.addBotResponse("I'm having trouble connecting right now. Please check your internet connection and try again.");
+                return;
+            }
+            
+            try {
+                // Send via WebSocket for real-time response
+                websocket.send(JSON.stringify({
+                    type: 'chat',
+                    userId: currentUserId,
+                    text: text,
+                    context: context
+                }));
+                
+                updateStatus('Sandy is thinking...');
+            } catch (error) {
+                console.error('Error sending message:', error);
+                chatbot.addBotResponse("Sorry, I had trouble processing your message. Please try again.");
+            }
+        }
+
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'chat_response':
+                    handleChatResponse(data);
+                    break;
+                case 'error':
+                    handleError(data);
+                    break;
+                default:
+                    console.log('Unknown message type:', data);
+            }
+        }
+
+        function handleChatResponse(data) {
+            updateStatus('Ready to chat!');
+            
+            chatbot.addBotResponse(data.response, {
+                suggestions: data.suggestions?.map(s => s.text || s),
+                showActions: data.recommendedActions && data.recommendedActions.length > 0,
+                actions: data.recommendedActions?.map(a => a.action).slice(0, 3)
+            });
+        }
+
+        function handleError(data) {
+            updateStatus('Error occurred');
+            chatbot.addBotResponse(`Sorry, I encountered an error: ${data.error}. Please try again.`);
+        }
+
+        async function showIntakeForm() {
+            try {
+                const response = await fetch(`/api/users/${currentUserId}/profile`);
+                let profile = null;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    profile = data.profile;
+                }
+                
+                const completionPercentage = profile?.intakeStatus?.completionPercentage || 0;
+                
+                if (completionPercentage < 100) {
+                    chatbot.addBotResponse(
+                        `Your profile is ${completionPercentage}% complete. Let me help you finish it so I can provide better personalized support. Would you like to continue with your intake form?`,
+                        {
+                            showActions: true,
+                            actions: ['Yes, continue intake', 'Tell me more about the intake', 'Maybe later']
+                        }
+                    );
+                } else {
+                    chatbot.addBotResponse(
+                        "Great! Your profile is complete. You can always update your information or tell me about any changes in your situation.",
+                        {
+                            showActions: true,
+                            actions: ['Update my profile', 'Review my information', 'Get recommendations']
+                        }
+                    );
+                }
+                
+                if (profile) {
+                    chatbot.updateProfile(profile);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching profile:', error);
+                chatbot.addBotResponse("I'm having trouble accessing your profile right now. Please try again in a moment.");
+            }
+        }
+
+        async function getRecommendations() {
+            try {
+                updateStatus('Generating recommendations...');
+                
+                const response = await fetch(`/api/users/${currentUserId}/recommendations`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to get recommendations');
+                }
+                
+                const data = await response.json();
+                updateStatus('Ready to chat!');
+                
+                if (data.error) {
+                    chatbot.addBotResponse(data.error);
+                    return;
+                }
+                
+                let responseText = `Here are some personalized recommendations for you:\n\n`;
+                
+                if (data.recommendations && data.recommendations.length > 0) {
+                    data.recommendations.forEach((rec, index) => {
+                        responseText += `**${index + 1}. ${rec.category.toUpperCase()}**\n${rec.text}\n\n`;
+                    });
+                } else {
+                    responseText = "I'd love to give you personalized recommendations! To get started, I'll need to know more about you. Would you like to complete your profile first?";
+                }
+                
+                chatbot.addBotResponse(responseText, {
+                    showActions: data.recommendations?.length > 0,
+                    actions: ['Tell me more', 'Get different recommendations', 'Save these recommendations']
+                });
+                
+            } catch (error) {
+                console.error('Error getting recommendations:', error);
+                updateStatus('Ready to chat!');
+                chatbot.addBotResponse("I'm having trouble generating recommendations right now. Please complete your profile first or try again later.");
+            }
+        }
+
+        function showSettings() {
+            chatbot.addBotResponse(
+                "Here are some options you can adjust:",
+                {
+                    showActions: true,
+                    actions: ['Change theme', 'Export my data', 'Privacy settings', 'Clear chat history']
+                }
+            );
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status-text').textContent = message;
+        }
+
+        function updateConnectionStatus(status) {
+            document.getElementById('connection-status').textContent = status;
+            const dot = document.querySelector('.status-dot');
+            dot.style.background = status === 'Connected' ? '#28a745' : '#dc3545';
+        }
+
+        // Global functions for buttons
+        window.startChat = function() {
+            chatbot.sendMessage("Hello Sandy! I'd like to get started.");
+            document.querySelector('.chat-container').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.learnMore = function() {
+            chatbot.addBotResponse(
+                `Hi! I'm Sandy, your personal support assistant. Here's what makes me special:
+
+**🎯 Personalized for You**
+I learn about your physical capabilities, energy patterns, and personal preferences to provide recommendations that actually fit your life.
+
+**🧠 Empathetic AI**
+I'm designed to understand not just what you need, but how you prefer to receive support - whether that's direct advice, gentle encouragement, or detailed explanations.
+
+**📋 Smart Intake Process**
+My intake form adapts to your answers, so you only get relevant questions. No generic surveys here!
+
+**💡 Actionable Guidance**
+I provide practical suggestions you can implement today, while keeping your long-term goals in mind.
+
+**🔒 Privacy First**
+Your information stays secure and is only used to help you better. You're always in control of your data.
+
+Ready to start? I'd love to learn about you and how I can best support your unique needs!`,
+                {
+                    showActions: true,
+                    actions: ['Start my profile', 'Ask a question', 'Tell me about intake']
+                }
+            );
+        };
+
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && !isConnected) {
+                initializeWebSocket();
+            }
+        });
+    </script>
+
+    <!-- Import chatbot module -->
+    <script type="module" src="./chatbot.js"></script>
+</body>
+</html>
