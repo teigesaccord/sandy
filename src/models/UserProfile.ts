@@ -93,7 +93,7 @@ export class UserProfile implements IUserProfile {
     this.userId = data.userId || '';
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
-    
+
     // Personal Information
     this.personalInfo = {
       name: data.personalInfo?.name || '',
@@ -188,7 +188,7 @@ export class UserProfile implements IUserProfile {
   // Update profile data
   update(updates: any): void {
     const allowedUpdates = [
-      'personalInfo', 'physicalNeeds', 'energyLevels', 'preferences', 
+      'personalInfo', 'physicalNeeds', 'energyLevels', 'preferences',
       'goals', 'context', 'supportNetwork', 'interactionHistory', 'intakeStatus'
     ];
 
@@ -220,7 +220,7 @@ export class UserProfile implements IUserProfile {
       if (section) {
         Object.values(section).forEach(value => {
           totalFields++;
-          if (value !== null && value !== undefined && value !== '' && 
+          if (value !== null && value !== undefined && value !== '' &&
               (Array.isArray(value) ? value.length > 0 : true)) {
             completedFields++;
           }
@@ -277,8 +277,8 @@ export class UserProfile implements IUserProfile {
     return {
       id: this.id,
       userId: this.userId,
-      createdAt: this.createdAt.toISOString(),
-      updatedAt: this.updatedAt.toISOString(),
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
       personalInfo: this.personalInfo,
       physicalNeeds: this.physicalNeeds,
       energyLevels: this.energyLevels,
@@ -341,7 +341,7 @@ export class UserProfile implements IUserProfile {
   getRecommendationContext(): Record<string, any> {
     const context = this.getPersonalizationContext();
     const completionPercentage = this.calculateCompletionPercentage();
-    
+
     return {
       ...context,
       profileCompleteness: completionPercentage,
@@ -356,14 +356,14 @@ export class UserProfile implements IUserProfile {
     if (!this.conversationHistory) {
       this.conversationHistory = [];
     }
-    
+
     this.conversationHistory.push(message);
-    
+
     // Keep conversation history manageable (last 100 messages)
     if (this.conversationHistory.length > 100) {
       this.conversationHistory.splice(0, this.conversationHistory.length - 100);
     }
-    
+
     // Update interaction history
     if (!this.interactionHistory) {
       this.interactionHistory = {
@@ -373,12 +373,12 @@ export class UserProfile implements IUserProfile {
         declinedRecommendations: []
       };
     }
-    
+
     if (message.role === 'user') {
       this.interactionHistory.totalInteractions++;
       this.interactionHistory.lastInteraction = new Date();
     }
-    
+
     this.updatedAt = new Date();
   }
 
