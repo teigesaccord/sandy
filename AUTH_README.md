@@ -2,6 +2,8 @@
 
 This document describes the authentication system implemented for the Sandy Chatbot application.
 
+For full local development setup (Postgres, Redis, venv, run commands) see `DEVELOPMENT.md`.
+
 ## Overview
 
 The authentication system has been upgraded from a simple localStorage-based user identification to a full PostgreSQL-backed authentication system with JWT tokens and secure password hashing.

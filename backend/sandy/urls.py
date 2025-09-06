@@ -38,6 +38,7 @@ urlpatterns = [
     
     # App-specific URLs
     path('api/users/', include('users.urls')),
+    path('api/profiles/', include('profiles.urls')),
     path('api/chat/', include('chat.urls')),
     path('api/recommendations/', include('recommendations.urls')),
     path('api/intake/', include('intake.urls')),
