@@ -152,7 +152,7 @@ async function checkDependencies() {
 async function initializeDatabase() {
   console.log('🗄️  Initializing PostgreSQL database...');
   
-  const dbUrl = process.env.DATABASE_URL || 'postgresql://sandy_user:sandy_password@localhost:5432/sandy_chatbot';
+  const dbUrl = process.env.DATABASE_URL || 'postgresql://sandy:sandy@localhost:5432/sandy_db';
   
   try {
     // Import and test PostgreSQL database service

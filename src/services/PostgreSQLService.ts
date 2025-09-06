@@ -38,7 +38,7 @@ export class PostgreSQLService implements DatabaseMethods {
   private bcryptRounds: number;
 
   constructor(connectionString?: string) {
-    const dbUrl = connectionString || process.env.DATABASE_URL || 'postgresql://sandy_user:sandy_password@localhost:5432/sandy_chatbot';
+  const dbUrl = connectionString || process.env.DATABASE_URL || 'postgresql://sandy:sandy@localhost:5432/sandy_db';
     
     this.pool = new Pool({
       connectionString: dbUrl,

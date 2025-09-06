@@ -12,7 +12,7 @@ let intakeService: IntakeFormService | null = null;
 const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000'),
   nodeEnv: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
-  databasePath: process.env.DATABASE_URL || 'postgresql://sandy_user:sandy_password@localhost:5432/sandy_chatbot',
+  databasePath: process.env.DATABASE_URL || 'postgresql://sandy:sandy@localhost:5432/sandy_db',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000'],
   aiConfig: {

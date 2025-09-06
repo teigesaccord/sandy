@@ -28,16 +28,16 @@ The authentication system has been upgraded from a simple localStorage-based use
 ## Database Schema
 
 ### Users Table
-```sql
-users (
-  id UUID PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  first_name VARCHAR(100),
-  last_name VARCHAR(100),
-  is_verified BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+```env
+# Database Configuration
+DATABASE_URL=postgresql://sandy:sandy@localhost:5432/sandy_db
+
+# Authentication & Security
+JWT_SECRET=your_very_secure_jwt_secret_here_change_in_production
+SESSION_SECRET=your_very_secure_session_secret_here_change_in_production
+JWT_EXPIRES_IN=7d
+BCRYPT_ROUNDS=12
+```
 )
 ```
 
@@ -209,7 +209,7 @@ Add these to your `.env` file:
 
 ```env
 # Database Configuration
-DATABASE_URL=postgresql://sandy_user:sandy_password@localhost:5432/sandy_chatbot
+DATABASE_URL=postgresql://sandy:sandy@localhost:5432/sandy_db
 
 # Authentication & Security
 JWT_SECRET=your_very_secure_jwt_secret_here_change_in_production
@@ -234,9 +234,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=sandy_chatbot
-      - POSTGRES_USER=sandy_user
-      - POSTGRES_PASSWORD=sandy_password
+      - POSTGRES_DB=sandy_db
+      - POSTGRES_USER=sandy
+      - POSTGRES_PASSWORD=sandy
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -246,7 +246,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://sandy_user:sandy_password@postgres:5432/sandy_chatbot
+      - DATABASE_URL=postgresql://sandy:sandy@postgres:5432/sandy_db
       - JWT_SECRET=${JWT_SECRET}
       # ... other env vars
 ```
