@@ -73,4 +73,49 @@ export class UserProfile implements IUserProfile {
       updatedAt: this.updatedAt
     };
   }
+
+  // Validate profile data
+  validate(): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Required fields validation
+    if (!this.userId) {
+      errors.push('User ID is required');
+    }
+
+    // Physical needs and accessibility validation
+    if (!this.physical_needs || this.physical_needs.length === 0) {
+      errors.push('At least one physical need must be selected');
+    }
+
+    if (!this.energy_level) {
+      errors.push('Energy level must be specified');
+    }
+
+    if (!this.main_device) {
+      errors.push('Main device must be specified');
+    }
+
+    if (!this.accessibility_adaptations || this.accessibility_adaptations.length === 0) {
+      errors.push('At least one accessibility adaptation must be selected');
+    }
+
+    if (!this.daily_task_challenges || this.daily_task_challenges.length === 0) {
+      errors.push('At least one daily task challenge must be selected');
+    }
+
+    // Required preferences validation
+    if (!this.send_photos) {
+      errors.push('Photo sharing preference must be specified');
+    }
+
+    if (!this.share_experiences) {
+      errors.push('Experience sharing preference must be specified');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
 }
