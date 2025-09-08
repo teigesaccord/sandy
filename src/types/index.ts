@@ -1,29 +1,24 @@
 // User Profile Types
 export interface UserProfile {
   userId: string;
-  personalInfo?: {
-    name?: string;
-    email?: string;
-    age?: number;
-    location?: string;
-  };
-  preferences?: {
-    communicationStyle?: 'casual' | 'professional' | 'friendly';
-    responseLength?: 'brief' | 'detailed' | 'comprehensive';
-    topics?: string[];
-    languages?: string[];
-  };
-  goals?: {
-    primary?: string;
-    secondary?: string[];
-    timeline?: string;
-  };
-  context?: {
-    industry?: string;
-    role?: string;
-    experience?: string;
-    challenges?: string[];
-  };
+  // Survey fields
+  physical_needs: string[];
+  energy_level: string;
+  main_device: string;
+  accessibility_adaptations: string[];
+  daily_task_challenges: string[];
+  send_photos: string;
+  condition_name?: string;
+  help_needed?: string;
+  share_experiences: string;
+  other_needs_soon?: string;
+  
+  // Profile fields
+  bio?: string;
+  avatar?: string;
+  location?: string;
+  
+  // System fields
   conversationHistory?: ConversationMessage[];
   intakeStatus?: {
     isCompleted: boolean;

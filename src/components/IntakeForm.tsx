@@ -228,61 +228,44 @@ export function IntakeForm({ userId, onComplete, onBack, className = '' }: Intak
   };
 
   const convertFormDataToProfile = (data: FormData): Partial<UserProfile> => {
-    const profile: any = {
-      personalInfo: {},
-      goals: {},
-      context: {},
-      preferences: {}
-    };
+    const profile: any = {};
 
     // Map form data back to profile structure
     Object.entries(data).forEach(([sectionId, sectionData]) => {
       Object.entries(sectionData).forEach(([questionId, value]) => {
         switch (questionId) {
-          case 'name':
-            profile.personalInfo.name = value;
+          case 'physical_needs':
+            profile.physical_needs = Array.isArray(value) ? value : [value];
             break;
-          case 'email':
-            profile.personalInfo.email = value;
+          case 'energy_level':
+            profile.energy_level = value;
             break;
-          case 'age':
-            profile.personalInfo.age = value ? Number(value) : undefined;
+          case 'main_device':
+            profile.main_device = value;
+            break;
+          case 'accessibility_adaptations':
+            profile.accessibility_adaptations = Array.isArray(value) ? value : [value];
+            break;
+          case 'daily_task_challenges':
+            profile.daily_task_challenges = Array.isArray(value) ? value : [value];
+            break;
+          case 'send_photos':
+            profile.send_photos = value;
+            break;
+          case 'condition_name':
+            profile.condition_name = value;
+            break;
+          case 'help_needed':
+            profile.help_needed = value;
+            break;
+          case 'share_experiences':
+            profile.share_experiences = value;
+            break;
+          case 'other_needs_soon':
+            profile.other_needs_soon = value;
             break;
           case 'location':
-            profile.personalInfo.location = value;
-            break;
-          case 'primary_goal':
-            profile.goals.primary = value;
-            break;
-          case 'secondary_goals':
-            profile.goals.secondary = typeof value === 'string' ? value.split(',').map((s: string) => s.trim()).filter(Boolean) : value;
-            break;
-          case 'timeline':
-            profile.goals.timeline = value;
-            break;
-          case 'industry':
-            profile.context.industry = value;
-            break;
-          case 'role':
-            profile.context.role = value;
-            break;
-          case 'experience':
-            profile.context.experience = value;
-            break;
-          case 'challenges':
-            profile.context.challenges = typeof value === 'string' ? value.split(',').map((s: string) => s.trim()).filter(Boolean) : value;
-            break;
-          case 'communication_style':
-            profile.preferences.communicationStyle = value;
-            break;
-          case 'response_length':
-            profile.preferences.responseLength = value;
-            break;
-          case 'topics_of_interest':
-            profile.preferences.topics = typeof value === 'string' ? value.split(',').map((s: string) => s.trim()).filter(Boolean) : value;
-            break;
-          case 'languages':
-            profile.preferences.languages = Array.isArray(value) ? value : [value];
+            profile.location = value;
             break;
         }
       });
