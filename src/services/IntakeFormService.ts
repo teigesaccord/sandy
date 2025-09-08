@@ -52,223 +52,190 @@ export class IntakeFormService {
 
   private initializeQuestionSets(): Record<string, DetailedIntakeSection> {
     return {
-      // Basic personal information
-      personal: {
-        id: 'personal',
-        title: "Personal Information",
-        description: "Help us get to know you better",
+      // Physical needs and accessibility
+      physical: {
+        id: 'physical',
+        title: "Physical Needs & Accessibility",
+        description: "Help us understand your physical needs to provide better suggestions",
         required: true,
         order: 1,
         questions: [
           {
-            id: "name",
-            type: "text",
-            label: "What would you like us to call you?",
-            question: "What would you like us to call you?",
-            path: "personalInfo.name",
-            placeholder: "Your preferred name",
+            id: "physical_needs",
+            type: "multiselect",
+            label: "What physical needs should the Assistant consider when suggesting tools, routines, or products?",
+            question: "What physical needs should the Assistant consider?",
+            path: "physical_needs",
             required: true,
-            validation: { minLength: 2, maxLength: 50 }
+            options: [
+              { value: "fine_motor_control", label: "Fine motor control challenges" },
+              { value: "hand_strength", label: "Hand strength limitations" },
+              { value: "hand_tremors", label: "Hand tremors" },
+              { value: "one_handed", label: "One-handed or limited use of one arm" },
+              { value: "one_legged", label: "One-legged or limited use of one leg" },
+              { value: "coordination", label: "Coordination challenges" },
+              { value: "balance", label: "Balance difficulties" },
+              { value: "swallowing", label: "Swallowing support needs" },
+              { value: "hearing", label: "Hearing support needs" },
+              { value: "vision", label: "Vision support needs" },
+              { value: "upper_body_movement", label: "Limited upper body movement or reach" },
+              { value: "lower_body_movement", label: "Limited lower body movement or reach" },
+              { value: "upper_body_strength", label: "Limited upper body strength" },
+              { value: "lower_body_strength", label: "Limited lower body strength" },
+              { value: "wheelchair", label: "Manual wheelchair use" },
+              { value: "powerchair", label: "Powerchair use" },
+              { value: "cane", label: "Cane use" },
+              { value: "walker", label: "Walker or rollator use" },
+              { value: "trekking_poles", label: "Trekking pole use" }
+            ]
           },
           {
-            id: "age",
-            type: "number",
-            label: "What is your age?",
-            question: "What is your age?",
-            path: "personalInfo.age",
-            placeholder: "Your age",
-            required: false,
-            validation: { min: 13, max: 120 }
-          },
-          {
-            id: "email",
-            type: "text",
-            label: "Email address (optional)",
-            question: "What is your email address?",
-            path: "personalInfo.email",
-            placeholder: "your.email@example.com",
-            required: false,
-            validation: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" }
-          },
-          {
-            id: "location",
-            type: "text",
-            label: "Location (optional)",
-            question: "What city or region are you in?",
-            path: "personalInfo.location",
-            placeholder: "City, State/Country",
-            required: false,
-            validation: { maxLength: 100 }
+            id: "energy_level",
+            type: "select",
+            label: "How much energy do you usually have in a day?",
+            question: "How much energy do you usually have in a day?",
+            path: "energy_level",
+            required: true,
+            options: [
+              { value: "very_low", label: "Very low (only enough for essentials)" },
+              { value: "moderate", label: "Moderate (a few tasks per day)" },
+              { value: "high", label: "High (I like a full schedule when possible)" }
+            ]
           }
         ]
       },
 
-      // Goals and priorities
-      goals: {
-        id: 'goals',
-        title: "Goals & Priorities",
-        description: "Tell us about what you'd like to achieve",
+      // Device and adaptation preferences
+      devices: {
+        id: 'devices',
+        title: "Devices & Adaptations",
+        description: "Tell us about the devices and adaptations you use",
         required: true,
         order: 2,
         questions: [
           {
-            id: "primary_goal",
-            type: "textarea",
-            label: "What is your main goal or priority right now?",
-            question: "What is your main goal or priority right now?",
-            path: "goals.primary",
-            placeholder: "Describe your primary objective...",
-            required: true,
-            validation: { minLength: 10, maxLength: 500 }
-          },
-          {
-            id: "secondary_goals",
-            type: "textarea",
-            label: "What other goals would you like to work towards?",
-            question: "What other goals would you like to work towards?",
-            path: "goals.secondary",
-            placeholder: "List any additional goals or objectives...",
-            required: false,
-            validation: { maxLength: 1000 }
-          },
-          {
-            id: "timeline",
+            id: "main_device",
             type: "select",
-            label: "What's your preferred timeline for achieving your main goal?",
-            question: "What's your preferred timeline for achieving your main goal?",
-            path: "goals.timeline",
-            required: false,
+            label: "What device do you mainly use to interact with tools and services?",
+            question: "What device do you mainly use?",
+            path: "main_device",
+            required: true,
             options: [
-              { value: "1-3 months", label: "1-3 months" },
-              { value: "3-6 months", label: "3-6 months" },
-              { value: "6-12 months", label: "6-12 months" },
-              { value: "1-2 years", label: "1-2 years" },
-              { value: "ongoing", label: "This is an ongoing goal" },
-              { value: "flexible", label: "I'm flexible with timing" }
+              { value: "mobile", label: "Smartphone or tablet" },
+              { value: "computer", label: "Laptop or desktop computer" },
+              { value: "voice", label: "Voice-controlled devices (like Alexa, Siri, etc.)" },
+              { value: "other", label: "Other" }
+            ]
+          },
+          {
+            id: "accessibility_adaptations",
+            type: "multiselect",
+            label: "Do you currently use any of the following accessibility adaptations at home?",
+            question: "What accessibility adaptations do you use?",
+            path: "accessibility_adaptations",
+            required: true,
+            options: [
+              { value: "smart_home", label: "Smart home devices (lights, locks, etc.)" },
+              { value: "robot_vacuum", label: "Robotic vacuum cleaner" },
+              { value: "kitchen_tools", label: "Adaptive kitchen tools" },
+              { value: "computer_tech", label: "Adaptive computer technology (keyboards, screen readers)" },
+              { value: "modified_vehicle", label: "Modified vehicles or transport" }
             ]
           }
         ]
       },
 
-      // Context and background
-      context: {
-        id: 'context',
-        title: "Background & Context",
-        description: "Help us understand your situation better",
+      // Daily challenges
+      challenges: {
+        id: 'challenges',
+        title: "Daily Challenges",
+        description: "Help us understand your daily challenges",
         required: true,
         order: 3,
         questions: [
           {
-            id: "industry",
-            type: "text",
-            label: "What industry do you work in? (optional)",
-            question: "What industry do you work in?",
-            path: "context.industry",
-            placeholder: "e.g., Healthcare, Technology, Education",
-            required: false,
-            validation: { maxLength: 100 }
-          },
-          {
-            id: "role",
-            type: "text",
-            label: "What is your role or profession? (optional)",
-            question: "What is your role or profession?",
-            path: "context.role",
-            placeholder: "e.g., Manager, Developer, Teacher",
-            required: false,
-            validation: { maxLength: 100 }
-          },
-          {
-            id: "experience",
-            type: "select",
-            label: "How much experience do you have in your field?",
-            question: "How much experience do you have in your field?",
-            path: "context.experience",
-            required: false,
-            options: [
-              { value: "entry-level", label: "Entry level (0-2 years)" },
-              { value: "junior", label: "Junior (2-5 years)" },
-              { value: "mid-level", label: "Mid-level (5-10 years)" },
-              { value: "senior", label: "Senior (10+ years)" },
-              { value: "executive", label: "Executive/Leadership" },
-              { value: "not-applicable", label: "Not applicable" }
-            ]
-          },
-          {
-            id: "challenges",
-            type: "textarea",
-            label: "What are your biggest challenges right now?",
-            question: "What are your biggest challenges right now?",
-            path: "context.challenges",
-            placeholder: "Describe the main obstacles you're facing...",
+            id: "daily_task_challenges",
+            type: "multiselect",
+            label: "What daily tasks do you find most challenging?",
+            question: "What daily tasks do you find most challenging?",
+            path: "daily_task_challenges",
             required: true,
-            validation: { minLength: 10, maxLength: 1000 }
+            options: [
+              { value: "cooking", label: "Cooking or meal prep" },
+              { value: "cleaning", label: "Cleaning or tidying" },
+              { value: "personal_care", label: "Personal care (bathing, dressing, etc.)" },
+              { value: "medications", label: "Managing medications" },
+              { value: "bathroom", label: "Using the bathroom" },
+              { value: "laundry", label: "Laundry" },
+              { value: "mobility", label: "Getting in/out of bed or chairs" },
+              { value: "shopping", label: "Grocery shopping or errands" },
+              { value: "communication", label: "Communicating with others" },
+              { value: "organization", label: "Organizing tasks or remembering steps" }
+            ]
           }
         ]
       },
 
-      // Communication preferences
-      preferences: {
-        id: 'preferences',
-        title: "Communication Preferences",
-        description: "Let us know how you prefer to receive support and information",
+      // Additional information
+      additional: {
+        id: 'additional',
+        title: "Additional Information",
+        description: "Help us provide better support",
         required: true,
         order: 4,
         questions: [
           {
-            id: "communication_style",
+            id: "send_photos",
             type: "select",
-            label: "How do you prefer to receive information and support?",
-            question: "How do you prefer to receive information and support?",
-            path: "preferences.communicationStyle",
+            label: "Would you be interested in sending photos of spaces or products for the Assistant to analyze?",
+            question: "Would you be interested in sending photos for analysis?",
+            path: "send_photos",
             required: true,
             options: [
-              { value: "professional", label: "Professional and structured" },
-              { value: "friendly", label: "Friendly and encouraging" },
-              { value: "casual", label: "Casual and conversational" }
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" },
+              { value: "maybe", label: "Maybe" }
             ]
           },
           {
-            id: "response_length",
-            type: "select",
-            label: "What length of responses do you prefer?",
-            question: "What length of responses do you prefer?",
-            path: "preferences.responseLength",
-            required: true,
-            options: [
-              { value: "brief", label: "Brief and to the point" },
-              { value: "detailed", label: "Detailed with explanations" },
-              { value: "comprehensive", label: "Comprehensive with examples and context" }
-            ]
+            id: "condition_name",
+            type: "text",
+            label: "Would you like to share your disability/condition name? (Optional)",
+            question: "What is your disability/condition name?",
+            path: "condition_name",
+            placeholder: "This helps us provide more tailored support",
+            required: false
           },
           {
-            id: "topics_of_interest",
+            id: "help_needed",
             type: "textarea",
-            label: "What topics are you most interested in?",
-            question: "What topics are you most interested in?",
-            path: "preferences.topics",
-            placeholder: "List topics, skills, or areas you'd like to focus on...",
-            required: false,
-            validation: { maxLength: 500 }
+            label: "Is there anything you'd like help with today? (Optional)",
+            question: "What would you like help with today?",
+            path: "help_needed",
+            placeholder: "Example: Find a lightweight vacuum cleaner, or organize my top 5 tasks into an easy plan",
+            required: false
           },
           {
-            id: "languages",
+            id: "share_experiences",
             type: "select",
-            label: "What is your preferred language?",
-            question: "What is your preferred language?",
-            path: "preferences.languages",
-            required: false,
+            label: "Would you like to anonymously share product experiences to help other users with similar needs?",
+            question: "Would you like to share product experiences?",
+            path: "share_experiences",
+            required: true,
             options: [
-              { value: "en", label: "English" },
-              { value: "es", label: "Spanish" },
-              { value: "fr", label: "French" },
-              { value: "de", label: "German" },
-              { value: "it", label: "Italian" },
-              { value: "pt", label: "Portuguese" },
-              { value: "zh", label: "Chinese" },
-              { value: "ja", label: "Japanese" },
-              { value: "other", label: "Other" }
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" },
+              { value: "maybe", label: "Maybe" }
             ]
+          },
+          {
+            id: "other_needs_soon",
+            type: "textarea",
+            label: "Is there anything else going on that might affect your needs soon? (Optional)",
+            question: "What might affect your needs soon?",
+            path: "other_needs_soon",
+            placeholder: "Examples: Upcoming surgery, temporary injury, flare-ups, moving, caregiving changes",
+            required: false
           }
         ]
       }
