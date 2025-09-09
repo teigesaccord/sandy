@@ -10,7 +10,7 @@
   --card-foreground: 222.2 84% 4.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
-  --primary: 221.2 83.2% 53.3%;
+  --primary: 222.2 78% 47%; /* blue */
   --primary-foreground: 210 40% 98%;
   --secondary: 210 40% 96%;
   --secondary-foreground: 222.2 84% 4.9%;
@@ -63,10 +63,39 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+/* Accessible base font sizing and improved line length */
+html, body {
+  font-size: 18px;
+  line-height: 1.45;
+}
+
 /* Focus styles for accessibility */
 *:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+  outline: 3px solid hsl(var(--ring));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Skip link visible on keyboard focus */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -40px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 8px 12px;
+  border-radius: 6px;
+  z-index: 60;
+  transition: top 0.2s ease;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Improve overall contrast for text elements */
+.text-muted-foreground {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.95;
 }
 
 /* Custom scrollbar */
@@ -155,7 +184,7 @@ body {
 }
 
 .btn-primary {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  @apply bg-[color:var(--primary)] text-primary-foreground hover:brightness-95 shadow-sm;
 }
 
 .btn-secondary {
@@ -163,7 +192,7 @@ body {
 }
 
 .btn-outline {
-  @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground;
+  @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground ring-1 ring-inset ring-transparent hover:ring-primary/20;
 }
 
 .btn-ghost {
@@ -193,7 +222,12 @@ body {
 
 /* Card styles */
 .card {
-  @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+  @apply rounded-lg border bg-card text-card-foreground shadow-lg;
+}
+
+/* Responsive header: mobile hamburger */
+.mobile-menu-button {
+  @apply md:hidden inline-flex items-center justify-center rounded-md p-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary;
 }
 
 .card-header {

@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
-  // Query backend health endpoint via proxy
-  const dbHealth = await (await import('../../../services/PostgreSQLService')).default.health();
-    
+    // Query backend health endpoint via proxy
+    const dbHealth = await (await import('../../../services/PostgreSQLService')).default.health();
+
+    // Normalize/defensive parsing: different backends may return different shapes
+    const dbStatus = (dbHealth && (dbHealth.status || dbHealth.state || dbHealth.statusText)) || 'unknown';
+    const details = (dbHealth && (dbHealth.details || dbHealth.data || null)) || null;
+    const responseTime = details && (details.responseTime || details.responseTimeMs || details.responseTimeMs === 0 ? (details.responseTime || details.responseTimeMs) : undefined);
+
     const healthStatus = {
-      status: dbHealth.status === 'healthy' ? 'healthy' : 'degraded',
-  timestamp: new Date().toISOString(),
+      status: dbStatus === 'healthy' || dbStatus === 'ok' ? 'healthy' : 'degraded',
+  timestamp: new Date().toString(),
       version: '1.0.0',
       service: 'Sandy Chatbot API',
       checks: {
         database: {
-          status: dbHealth.status,
-          responseTime: dbHealth.details.responseTime,
-          details: dbHealth.details
+          status: dbStatus,
+          responseTime: responseTime,
+          details: details
         },
         api: {
           status: 'healthy'
@@ -21,8 +26,8 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    const responseStatus = dbHealth.status === 'healthy' ? 200 : 503;
-    
+    const responseStatus = dbStatus === 'healthy' || dbStatus === 'ok' ? 200 : 503;
+
     return NextResponse.json(healthStatus, { status: responseStatus });
     
   } catch (error) {
@@ -30,7 +35,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         status: 'unhealthy',
-        timestamp: new Date().toISOString(),
+  timestamp: new Date().toString(),
         error: 'Health check failed',
         checks: {
           database: {

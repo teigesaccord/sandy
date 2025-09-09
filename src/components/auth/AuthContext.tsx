@@ -1,6 +1,7 @@
-'use client';
+ 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import PostgreSQLService from '../../../src/services/PostgreSQLService';
 
 interface User {
   id: string;
@@ -46,22 +47,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
+      const data = await PostgreSQLService.me();
+      if (data) setUser(data);
+      else setUser(null);
+    } catch (err) {
       setUser(null);
     } finally {
       setLoading(false);
@@ -70,23 +59,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUser(data.user);
+      const data = await PostgreSQLService.login(email, password);
+      // PostgreSQLService.login stores tokens and returns token payload / user info when available
+      if (data) {
+        // Try to fetch /me to get user object
+        try {
+          const me = await PostgreSQLService.me();
+          setUser(me || null);
+        } catch (err) {
+          setUser(null);
+        }
         return { success: true };
-      } else {
-        return { success: false, error: data.error || 'Login failed' };
       }
+      return { success: false, error: 'Login failed' };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: 'Network error occurred' };
@@ -100,23 +85,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     lastName?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, firstName, lastName }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setUser(data.user);
+      const data = await PostgreSQLService.register(email, password, firstName, lastName);
+      if (data) {
+        // After registration, attempt to login automatically (if tokens provided)
+        try {
+          const me = await PostgreSQLService.me();
+          setUser(me || null);
+        } catch (err) {
+          setUser(null);
+        }
         return { success: true };
-      } else {
-        return { success: false, error: data.error || 'Registration failed' };
       }
+      return { success: false, error: 'Registration failed' };
     } catch (error) {
       console.error('Registration error:', error);
       return { success: false, error: 'Network error occurred' };
@@ -125,13 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async (): Promise<void> => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await PostgreSQLService.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

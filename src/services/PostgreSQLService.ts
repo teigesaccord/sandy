@@ -23,11 +23,20 @@ try {
 
 async function request(path: string, options: RequestInit = {}) {
   const url = API_HOST + path;
+  // Automatically attach stored access token (if present) to avoid CSRF/session cookies
+  const storedAccess = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
+  const authHeader = storedAccess ? { Authorization: `Bearer ${storedAccess}` } : {};
+
+  // Build headers with correct typing for fetch
+  const baseHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(authHeader as Record<string, string>),
+    ...((options.headers as Record<string, string>) || {})
+  };
+
   const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    },
+    headers: baseHeaders as HeadersInit,
+    // keep include for cases where cookies are still used (e.g., session-based endpoints)
     credentials: 'include',
     ...options
   });
@@ -54,13 +63,32 @@ export const PostgreSQLService = {
   },
 
   async login(email: string, password: string) {
-    return request('/api/auth/login/', {
+    const data = await request('/api/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
+
+    // TokenObtainPairView returns { access, refresh }
+    if (data && data.access) {
+      try {
+        localStorage.setItem('sandy_access', data.access);
+        if (data.refresh) localStorage.setItem('sandy_refresh', data.refresh);
+      } catch (err) {
+        // ignore storage errors in SSR or private mode
+      }
+    }
+
+    return data;
   },
 
   async logout() {
+    // Clear stored tokens and call logout endpoint
+    try {
+      localStorage.removeItem('sandy_access');
+      localStorage.removeItem('sandy_refresh');
+    } catch (err) {
+      // ignore
+    }
     return request('/api/auth/logout/', { method: 'POST' });
   },
 
