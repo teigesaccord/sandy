@@ -1,11 +1,11 @@
 import { AIService } from '../services/AIService';
-import PostgreSQLService from '../services/PostgreSQLService';
+import PostgreSQLService, { PostgreSQLServiceType } from '../services/PostgreSQLService';
 import { IntakeFormService } from '../services/IntakeFormService';
 import type { AppConfig } from '../types';
 
 // Global service instances
 let aiService: AIService | null = null;
-let dbService: PostgreSQLService | null = null;
+let dbService: PostgreSQLServiceType | null = null;
 let intakeService: IntakeFormService | null = null;
 
 // Configuration
@@ -29,7 +29,7 @@ const config: AppConfig = {
 // Initialize services
 export async function initializeServices(): Promise<{
   aiService: AIService;
-  dbService: PostgreSQLService;
+  dbService: PostgreSQLServiceType;
   intakeService: IntakeFormService;
 }> {
   try {
@@ -44,10 +44,8 @@ export async function initializeServices(): Promise<{
     // Initialize Database Service (frontend proxy) — no DB connections from frontend
     if (!dbService) {
       // PostgreSQLService here is a thin HTTP client that forwards requests to the Django backend
-      // It does not perform any direct DB initialization.
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      dbService = PostgreSQLService;
+      // It does not perform any direct DB initialization. Assign the singleton object.
+      dbService = PostgreSQLService as PostgreSQLServiceType;
     }
 
     // Initialize Intake Form Service
@@ -75,7 +73,7 @@ export async function getAIService(): Promise<AIService> {
   return aiService;
 }
 
-export async function getDBService(): Promise<PostgreSQLService> {
+export async function getDBService(): Promise<PostgreSQLServiceType> {
   if (!dbService) {
     const services = await initializeServices();
     return services.dbService;

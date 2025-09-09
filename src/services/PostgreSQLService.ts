@@ -4,7 +4,22 @@
    Note: Update API_HOST if Django runs on a different origin during development.
 */
 
-const API_HOST = process.env.NEXT_PUBLIC_API_HOST || '';
+// Ensure we have an absolute host for server-side requests during build/export.
+// NEXT_PUBLIC_API_HOST is used in the browser; API_HOST falls back to API_HOST or localhost:8000 for Django.
+let API_HOST = (process.env.NEXT_PUBLIC_API_HOST || process.env.API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+
+// Sanitize local development hosts: if someone mistakenly set https://localhost:8000
+// force plain http so fetch doesn't attempt TLS against a non-TLS dev server.
+try {
+  const parsed = new URL(API_HOST);
+  const hostname = parsed.hostname;
+  if ((hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') && parsed.protocol === 'https:') {
+    parsed.protocol = 'http:';
+    API_HOST = parsed.toString().replace(/\/$/, '');
+  }
+} catch (err) {
+  // If parsing fails, keep the fallback value which is an absolute http URL.
+}
 
 async function request(path: string, options: RequestInit = {}) {
   const url = API_HOST + path;
@@ -111,5 +126,7 @@ export const PostgreSQLService = {
     return request('/api/health/');
   }
 };
+
+export type PostgreSQLServiceType = typeof PostgreSQLService;
 
 export default PostgreSQLService;

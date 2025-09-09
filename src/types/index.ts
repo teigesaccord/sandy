@@ -17,6 +17,44 @@ export interface UserProfile {
   bio?: string;
   avatar?: string;
   location?: string;
+  // Convenience grouped personal information used by UI components
+  personalInfo?: {
+    name?: string;
+    email?: string;
+    location?: string;
+    phone?: string;
+    dob?: string;
+  };
+
+  // Goals, context and user preferences surfaced in the UI
+  goals?: {
+  primary?: string;
+  // Secondary goals as an array
+  secondary?: string[];
+  // Timeline for goals (e.g., '3 months', '6 months')
+  timeline?: string;
+  horizon?: string;
+  };
+
+  context?: {
+  industry?: string;
+  role?: string;
+  companySize?: string;
+  // Experience level and explicit challenges
+  experience?: string;
+  challenges?: string[];
+  additional?: Record<string, any>;
+  };
+
+  preferences?: {
+  communicationStyle?: string;
+  language?: string;
+  timezone?: string;
+  // Preferred response length for AI: brief|detailed|comprehensive
+  responseLength?: 'brief' | 'detailed' | 'comprehensive';
+  // Topics of interest used by recommendation prompts
+  topics?: string[];
+  };
   
   // System fields
   conversationHistory?: ConversationMessage[];
