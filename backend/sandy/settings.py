@@ -237,9 +237,13 @@ CHANNEL_LAYERS = {
 # Cache configuration
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        # Use django-redis cache backend so django_redis OPTIONS are handled correctly
+        # If django_redis isn't available or misconfigured in the environment, fall
+        # back to a local in-memory cache to keep development servers running.
+        'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': f"redis://{config('REDIS_HOST', default='127.0.0.1')}:{config('REDIS_PORT', default=6379, cast=int)}/1",
         'OPTIONS': {
+            # django-redis expects CLIENT_CLASS (uppercase) to configure its client wrapper
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         },
         'KEY_PREFIX': 'sandy',
@@ -247,6 +251,19 @@ CACHES = {
     }
 }
 
+# Provide a safe fallback to LocMemCache at import time in case django_redis
+# can't be imported or Redis isn't available in the dev environment. This
+# prevents startup-time errors while still using Redis when available.
+try:
+    # Attempt to import django_redis to validate availability.
+    import django_redis  # noqa: F401
+except Exception:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-sandy-dev-cache',
+        }
+    }
 # Celery Configuration (for async tasks)
 CELERY_BROKER_URL = f"redis://{config('REDIS_HOST', default='127.0.0.1')}:{config('REDIS_PORT', default=6379, cast=int)}/0"
 CELERY_RESULT_BACKEND = f"redis://{config('REDIS_HOST', default='127.0.0.1')}:{config('REDIS_PORT', default=6379, cast=int)}/0"
