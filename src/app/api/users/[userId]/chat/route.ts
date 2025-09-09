@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAIService, checkRateLimit, handleApiError, getCorsHeaders, validateMessage } from '../../../../../lib/services';
 import { UserProfile } from '../../../../../models/UserProfile';
-import { PostgreSQLService } from '../../../../../services/PostgreSQLService';
+import PostgreSQLService from '../../../../../services/PostgreSQLService';
 import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
 
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
 
 export const POST = requireAuth(async (
   request: NextRequest,
@@ -73,34 +65,30 @@ export const POST = requireAuth(async (
 
     // Get services
     const aiService = await getAIService();
-    const dbService = getDBService();
-    await dbService.initialize();
 
-    // Get or create user profile
-    let profile = await dbService.getUserProfile(userId);
+    // Get or create user profile via backend API
+    let profile = await PostgreSQLService.getUserProfile(userId);
     if (!profile) {
       profile = new UserProfile({ userId });
-      await dbService.saveUserProfile(userId, profile);
+      await PostgreSQLService.saveUserProfile(userId, profile);
     }
 
     // Process chat message with AI
     const response = await aiService.chat(userId, message, profile, context || {});
 
-    // Save the conversation to the database
-    await dbService.saveConversation(userId, 'user', message, context);
-    await dbService.saveConversation(userId, 'assistant', response.response);
+    // Save the conversation to the backend
+    await PostgreSQLService.saveConversation(userId, 'user', message, context);
+    await PostgreSQLService.saveConversation(userId, 'assistant', response.response);
 
     // Record interaction for analytics
-    await dbService.recordInteraction(userId, 'chat', { 
-      message: message.substring(0, 100), // First 100 chars for privacy
+    await PostgreSQLService.recordInteraction(userId, 'chat', {
+      message: message.substring(0, 100),
       responseLength: response.response.length,
       intent: response.intent
     });
 
-    // Conversation history is automatically managed by the database service
-
     // Save updated profile
-    await dbService.saveUserProfile(userId, profile);
+    await PostgreSQLService.saveUserProfile(userId, profile);
 
     return NextResponse.json(
       {
@@ -182,13 +170,11 @@ export const GET = requireAuth(async (
       );
     }
 
-    const dbService = getDBService();
-    await dbService.initialize();
-    const url = new URL(request.url);
+  const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit') || '50');
     
     // Get conversation history
-    const history = await dbService.getConversationHistory(userId, limit);
+  const history = await PostgreSQLService.getConversationHistory(userId, limit);
 
     return NextResponse.json(
       { history },
@@ -241,15 +227,13 @@ export const DELETE = requireAuth(async (
       );
     }
 
-    const aiService = await getAIService();
-    const dbService = getDBService();
-    await dbService.initialize();
+  const aiService = await getAIService();
 
-    // Clear conversation history in AI service
-    aiService.clearUserHistory(userId);
+  // Clear conversation history in AI service
+  aiService.clearUserHistory(userId);
 
-    // Clear conversation history in database
-    await dbService.clearConversationHistory(userId);
+  // Clear conversation history in backend via proxy
+  await PostgreSQLService.clearConversationHistory(userId);
 
     return NextResponse.json(
       { message: 'Conversation history cleared successfully' },

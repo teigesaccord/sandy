@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, handleApiError, getCorsHeaders } from '../../../../../lib/services';
 import { UserProfile } from '../../../../../models/UserProfile';
-import { PostgreSQLService } from '../../../../../services/PostgreSQLService';
+import PostgreSQLService from '../../../../../services/PostgreSQLService';
 import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
 
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
+// Use frontend HTTP proxy to talk to Django backend
 
 export const GET = requireAuth(async (request: NextRequest, { params }: { params: { userId: string } }) => {
   try {
@@ -47,9 +40,7 @@ export const GET = requireAuth(async (request: NextRequest, { params }: { params
       );
     }
 
-    const dbService = getDBService();
-    await dbService.initialize();
-    const profile = await dbService.getUserProfile(userId);
+  const profile = await PostgreSQLService.getUserProfile(userId);
 
     if (!profile) {
       return NextResponse.json(
@@ -117,11 +108,8 @@ export const POST = requireAuth(async (request: NextRequest, { params }: { param
       );
     }
 
-    const dbService = getDBService();
-    await dbService.initialize();
-    
-    // Get existing profile or create new one
-    let profile = await dbService.getUserProfile(userId);
+  // Get existing profile or create new one via backend
+  let profile = await PostgreSQLService.getUserProfile(userId);
     if (profile) {
       profile.update(profileData);
     } else {
@@ -137,13 +125,9 @@ export const POST = requireAuth(async (request: NextRequest, { params }: { param
       );
     }
 
-    // Save profile
-    await dbService.saveUserProfile(userId, profile);
-
-    // Record profile update interaction
-    await dbService.recordInteraction(userId, 'profile_update', {
-      timestamp: new Date().toISOString()
-    });
+  // Save profile and record interaction via backend
+  await PostgreSQLService.saveUserProfile(userId, profile);
+  await PostgreSQLService.recordInteraction(userId, 'profile_update', { timestamp: (new Date()).toISOString() });
 
     return NextResponse.json(
       { profile: profile.toJSON() },
@@ -195,9 +179,7 @@ export const DELETE = requireAuth(async (request: NextRequest, { params }: { par
       );
     }
 
-    const dbService = getDBService();
-    await dbService.initialize();
-    const success = await dbService.deleteUserProfile(userId);
+  const success = await PostgreSQLService.deleteUserProfile(userId);
 
     if (!success) {
       return NextResponse.json(

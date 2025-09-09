@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PostgreSQLService } from '../../../../services/PostgreSQLService';
+import PostgreSQLService from '../../../../services/PostgreSQLService';
 import { 
   validateEmail, 
   validatePassword, 
@@ -7,15 +7,6 @@ import {
   checkAuthRateLimit
 } from '../../../../lib/auth';
 import { getCorsHeaders } from '../../../../lib/services';
-
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -109,67 +100,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize database service
-    const db = getDBService();
-    await db.initialize();
-
     try {
-      // Register user
-      const result = await db.registerUser(
+      const result = await PostgreSQLService.register(
         email.toLowerCase().trim(),
         password,
         firstName?.trim(),
         lastName?.trim()
       );
 
-      // Log successful registration
       console.log(`New user registered: ${email}`);
 
-      // Record registration interaction
-      await db.recordInteraction(result.user.id, 'registration', {
-        email: email.toLowerCase().trim(),
-        hasFirstName: !!firstName,
-        hasLastName: !!lastName,
-        timestamp: new Date().toISOString()
-      });
+      try {
+        await PostgreSQLService.recordInteraction(result.user.id, 'registration', {
+          email: email.toLowerCase().trim(),
+          hasFirstName: !!firstName,
+          hasLastName: !!lastName,
+          timestamp: (new Date()).toISOString()
+        });
+      } catch (ie) {
+        console.warn('Failed to record registration interaction', ie);
+      }
 
-      // Return success response with auth token
       return createAuthResponse(
-        {
-          message: 'Registration successful',
-          user: {
-            id: result.user.id,
-            email: result.user.email,
-            firstName: result.user.first_name,
-            lastName: result.user.last_name,
-            isVerified: result.user.is_verified,
-            createdAt: result.user.created_at
-          }
-        },
+        { message: 'Registration successful', user: result.user },
         result.token
       );
 
     } catch (error) {
       console.error('Registration error:', error);
 
-      if (error instanceof Error) {
-        if (error.message === 'User already exists') {
-          return NextResponse.json(
-            { error: 'An account with this email already exists' },
-            { 
-              status: 409,
-              headers: getCorsHeaders(request.headers.get('origin') || undefined)
-            }
-          );
-        }
-      }
+      const errMsg = (error as any)?.message || 'Registration failed. Please try again.';
+      const status = /already exists|409/.test(errMsg) ? 409 : 500;
 
       return NextResponse.json(
-        { error: 'Registration failed. Please try again.' },
-        { 
-          status: 500,
-          headers: getCorsHeaders(request.headers.get('origin') || undefined)
-        }
+        { error: errMsg },
+        { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 

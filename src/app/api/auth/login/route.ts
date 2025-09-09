@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PostgreSQLService } from '../../../../services/PostgreSQLService';
+import PostgreSQLService from '../../../../services/PostgreSQLService';
 import { 
   validateEmail, 
   createAuthResponse, 
@@ -7,15 +7,6 @@ import {
   clearAuthRateLimit
 } from '../../../../lib/auth';
 import { getCorsHeaders } from '../../../../lib/services';
-
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,42 +64,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize database service
-    const db = getDBService();
-    await db.initialize();
-
     try {
-      // Attempt login
-      const result = await db.loginUser(
-        email.toLowerCase().trim(),
-        password
-      );
+      // Call backend auth endpoint via proxy
+      const result = await PostgreSQLService.login(email.toLowerCase().trim(), password);
 
       // Clear rate limit on successful login
       clearAuthRateLimit(`login_${clientIP}`);
 
-      // Log successful login
-      console.log(`User logged in: ${email}`);
+      // Record login interaction (best-effort, don't block on failure)
+      try {
+        await PostgreSQLService.recordInteraction(result.user.id, 'login', {
+          email: email.toLowerCase().trim(),
+          timestamp: (new Date()).toISOString(),
+          ip: clientIP
+        });
+      } catch (ie) {
+        console.warn('Failed to record login interaction', ie);
+      }
 
-      // Record login interaction
-      await db.recordInteraction(result.user.id, 'login', {
-        email: email.toLowerCase().trim(),
-        timestamp: new Date().toISOString(),
-        ip: clientIP
-      });
-
-      // Return success response with auth token
+      // Return response and set auth cookie using token from backend
       return createAuthResponse(
         {
           message: 'Login successful',
-          user: {
-            id: result.user.id,
-            email: result.user.email,
-            firstName: result.user.first_name,
-            lastName: result.user.last_name,
-            isVerified: result.user.is_verified,
-            createdAt: result.user.created_at
-          }
+          user: result.user
         },
         result.token
       );
@@ -116,24 +94,13 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Login error:', error);
 
-      if (error instanceof Error) {
-        if (error.message === 'Invalid credentials') {
-          return NextResponse.json(
-            { error: 'Invalid email or password' },
-            { 
-              status: 401,
-              headers: getCorsHeaders(request.headers.get('origin') || undefined)
-            }
-          );
-        }
-      }
+      // Proxy returns structured error messages; surface them where applicable
+      const errMsg = (error as any)?.message || 'Login failed. Please try again.';
+      const status = /401|403/.test(errMsg) ? 401 : 500;
 
       return NextResponse.json(
-        { error: 'Login failed. Please try again.' },
-        { 
-          status: 500,
-          headers: getCorsHeaders(request.headers.get('origin') || undefined)
-        }
+        { error: errMsg },
+        { status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 

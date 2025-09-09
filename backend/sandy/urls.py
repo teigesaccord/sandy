@@ -30,6 +30,7 @@ urlpatterns = [
     # API endpoints
     path('api/', include(router.urls)),
     path('api/auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path('api/auth/', include('users.urls')),
     
     # JWT Authentication endpoints
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

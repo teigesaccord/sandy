@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PostgreSQLService } from '../../../services/PostgreSQLService';
-
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const db = getDBService();
-    
-    // Check database health
-    const dbHealth = await db.healthCheck();
+  // Query backend health endpoint via proxy
+  const dbHealth = await (await import('../../../services/PostgreSQLService')).default.health();
     
     const healthStatus = {
       status: dbHealth.status === 'healthy' ? 'healthy' : 'degraded',
-      timestamp: new Date().toISOString(),
+  timestamp: new Date().toISOString(),
       version: '1.0.0',
       service: 'Sandy Chatbot API',
       checks: {

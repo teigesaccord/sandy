@@ -1,5 +1,5 @@
 import { AIService } from '../services/AIService';
-import { PostgreSQLService } from '../services/PostgreSQLService';
+import PostgreSQLService from '../services/PostgreSQLService';
 import { IntakeFormService } from '../services/IntakeFormService';
 import type { AppConfig } from '../types';
 
@@ -41,10 +41,13 @@ export async function initializeServices(): Promise<{
       aiService = new AIService(config.openaiApiKey, config.aiConfig);
     }
 
-    // Initialize Database Service
+    // Initialize Database Service (frontend proxy) — no DB connections from frontend
     if (!dbService) {
-      dbService = new PostgreSQLService(config.databasePath);
-      await dbService.initialize();
+      // PostgreSQLService here is a thin HTTP client that forwards requests to the Django backend
+      // It does not perform any direct DB initialization.
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      dbService = PostgreSQLService;
     }
 
     // Initialize Intake Form Service

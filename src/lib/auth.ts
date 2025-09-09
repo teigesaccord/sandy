@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
-import { PostgreSQLService } from '../services/PostgreSQLService';
+import PostgreSQLService from '../services/PostgreSQLService';
 
 export interface AuthenticatedUser {
   id: string;
@@ -16,19 +16,12 @@ export interface AuthenticatedRequest extends NextRequest {
   user?: AuthenticatedUser;
 }
 
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
-
 export async function verifyToken(token: string): Promise<AuthenticatedUser | null> {
   try {
-    const db = getDBService();
-    return await db.verifyToken(token);
+  // Ask backend to validate the token and return user info
+  const me = await PostgreSQLService.me(token);
+  if (!me || !me.id) return null;
+  return me as AuthenticatedUser;
   } catch (error) {
     console.error('Token verification error:', error);
     return null;

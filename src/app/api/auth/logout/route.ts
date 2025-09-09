@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PostgreSQLService } from '../../../../services/PostgreSQLService';
+import PostgreSQLService from '../../../../services/PostgreSQLService';
 import { 
   extractTokenFromRequest,
   createLogoutResponse
 } from '../../../../lib/auth';
 import { getCorsHeaders } from '../../../../lib/services';
-
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,23 +21,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize database service
-    const db = getDBService();
-    await db.initialize();
-
     try {
-      // Logout user (remove session from database)
-      await db.logout(token);
+      // Call backend logout endpoint via proxy (best-effort)
+      try {
+        await PostgreSQLService.logout();
+      } catch (le) {
+        console.warn('Backend logout failed, clearing cookie anyway', le);
+      }
 
-      console.log('User logged out successfully');
-
-      // Return success response and clear cookie
       return createLogoutResponse();
 
     } catch (error) {
       console.error('Logout error:', error);
-
-      // Even if there's an error removing the session, clear the cookie
       return createLogoutResponse();
     }
 

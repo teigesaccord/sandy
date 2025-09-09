@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAIService, checkRateLimit, handleApiError, getCorsHeaders } from '../../../../../lib/services';
-import { PostgreSQLService } from '../../../../../services/PostgreSQLService';
+import PostgreSQLService from '../../../../../services/PostgreSQLService';
 import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
 
-let dbService: PostgreSQLService | null = null;
-
-function getDBService(): PostgreSQLService {
-  if (!dbService) {
-    dbService = new PostgreSQLService();
-  }
-  return dbService;
-}
+// Use frontend HTTP proxy to talk to Django backend
 
 export const GET = requireAuth(async (
   request: NextRequest,
@@ -53,13 +46,11 @@ export const GET = requireAuth(async (
     const url = new URL(request.url);
     const area = url.searchParams.get('area');
 
-    // Get services
-    const aiService = await getAIService();
-    const dbService = getDBService();
-    await dbService.initialize();
+  // Get services
+  const aiService = await getAIService();
 
-    // Get user profile
-    const profile = await dbService.getUserProfile(userId);
+  // Get user profile via backend API
+  const profile = await PostgreSQLService.getUserProfile(userId);
     if (!profile) {
       return NextResponse.json(
         { error: 'User profile not found' },
@@ -85,12 +76,12 @@ export const GET = requireAuth(async (
 
     // Save recommendations to database for analytics
     try {
-      await dbService.saveRecommendation(
+      await PostgreSQLService.saveRecommendation(
         userId,
         area || 'general',
         {
           recommendations: result.recommendations,
-          generatedAt: new Date().toISOString(),
+          generatedAt: (new Date()).toISOString(),
           profileCompleteness: profile.intakeStatus?.completionPercentage || 0
         }
       );
@@ -99,18 +90,21 @@ export const GET = requireAuth(async (
       // Don't fail the request if we can't save to DB
     }
 
-    // Record interaction
-    // Record recommendation interaction
-    await dbService.recordInteraction(userId, 'recommendation_request', {
-      area: area || 'general',
-      recommendationCount: result.recommendations.length
-    });
+    // Record recommendation interaction (best-effort)
+    try {
+      await PostgreSQLService.recordInteraction(userId, 'recommendation_request', {
+        area: area || 'general',
+        recommendationCount: result.recommendations.length
+      });
+    } catch (ie) {
+      console.warn('Failed to record recommendation interaction', ie);
+    }
 
     return NextResponse.json(
       {
         recommendations: result.recommendations,
         personalizedFor: profile.personalInfo?.name || 'User',
-        generatedAt: new Date().toISOString(),
+  generatedAt: (new Date()).toISOString(),
         focusArea: area || 'general',
         profileCompleteness: profile.intakeStatus?.completionPercentage || 0
       },
@@ -161,7 +155,7 @@ export const GET = requireAuth(async (
         recommendations: fallbackRecommendations,
         error: message,
         fallback: true,
-        generatedAt: new Date().toISOString(),
+            generatedAt: (new Date()).toISOString(),
         focusArea: 'general'
       },
       { 
