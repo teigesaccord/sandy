@@ -278,7 +278,7 @@ OPENAI_MODEL = config('OPENAI_MODEL', default='gpt-3.5-turbo')
 OPENAI_TEMPERATURE = config('OPENAI_TEMPERATURE', default=0.7, cast=float)
 OPENAI_MAX_TOKENS = config('OPENAI_MAX_TOKENS', default=2000, cast=int)
 
-# Logging configuration
+# Logging configuration - simplified for Docker environments
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -292,39 +292,25 @@ LOGGING = {
             'style': '{',
         },
     },
-    'filters': {
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',
-        },
-    },
     'handlers': {
         'console': {
             'level': 'INFO',
-            'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
-        },
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'maxBytes': 1024 * 1024 * 15,  # 15MB
-            'backupCount': 10,
-            'formatter': 'verbose',
+            'formatter': 'verbose'
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': config('DJANGO_LOG_LEVEL', default='INFO'),
             'propagate': False,
         },
         'sandy': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': config('APP_LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO'),
             'propagate': False,
         },

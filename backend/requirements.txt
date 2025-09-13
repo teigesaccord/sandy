@@ -6,7 +6,7 @@ python-decouple==3.8
 dj-database-url==2.1.0
 
 # PostgreSQL
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 
 # Authentication and security
 djangorestframework-simplejwt==5.3.1
@@ -35,7 +35,7 @@ redis==5.0.1
 celery==5.3.4
 
 # Utilities
-Pillow==10.1.0
+Pillow==11.3.0
 uuid==1.30
 python-dateutil==2.8.2
 
@@ -74,4 +74,3 @@ pydantic==2.5.3
 # Timezone support
 pytz==2023.3.post1
 PyJWT==2.8.0
-
