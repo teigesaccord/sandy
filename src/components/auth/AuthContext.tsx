@@ -62,6 +62,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const data = await PostgreSQLService.login(email, password);
       // PostgreSQLService.login stores tokens and returns token payload / user info when available
       if (data) {
+        // Add small delay to ensure localStorage is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
         // Try to fetch /me to get user object
         try {
           const me = await PostgreSQLService.me();

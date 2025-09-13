@@ -8,6 +8,7 @@ import { UserProfileCard } from '../components/UserProfileCard';
 import { StatusIndicator } from '../components/StatusIndicator';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { useAuth } from '../components/auth/AuthContext';
+import PostgreSQLService from '../services/PostgreSQLService';
 
 function AuthenticatedHomePage() {
   const { user, logout } = useAuth();
@@ -27,16 +28,8 @@ function AuthenticatedHomePage() {
     if (!user) return;
     
     try {
-      const response = await fetch(`/api/users/${user.id}/profile`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUserProfile(data.profile);
-      }
+      const data = await PostgreSQLService.getUserProfile(user.id);
+      setUserProfile(data);
     } catch (error) {
       console.error('Failed to load user profile:', error);
     }

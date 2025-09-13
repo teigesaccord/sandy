@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Check, AlertCircle } from 'lucide-react';
 import type { IntakeSection, IntakeQuestion, UserProfile } from '../types';
+import PostgreSQLService from '../services/PostgreSQLService';
 
 interface IntakeFormProps {
   userId: string;
@@ -46,13 +47,10 @@ export function IntakeForm({ userId, onComplete, onBack, className = '' }: Intak
 
   const loadUserProfile = async () => {
     try {
-      const response = await fetch(`/api/users/${userId}/profile`);
-      if (response.ok) {
-        const data = await response.json();
-        setUserProfile(data.profile);
-        // Pre-populate form with existing data
-        populateFormFromProfile(data.profile);
-      }
+      const data = await PostgreSQLService.getUserProfile(userId);
+      setUserProfile(data);
+      // Pre-populate form with existing data
+      populateFormFromProfile(data);
     } catch (error) {
       console.error('Failed to load user profile:', error);
     }
@@ -203,22 +201,9 @@ export function IntakeForm({ userId, onComplete, onBack, className = '' }: Intak
       const profileUpdates = convertFormDataToProfile(formData);
       
       // Submit to API
-      const response = await fetch(`/api/users/${userId}/profile`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(profileUpdates)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        onComplete(data.profile);
-      } else {
-        const errorData = await response.json();
-        console.error('Form submission failed:', errorData);
-        setErrors({ submit: errorData.error || 'Failed to save profile' });
-      }
+      const result = await PostgreSQLService.saveUserProfile(userId, profileUpdates);
+      setUserProfile(result);
+      onComplete(result);
     } catch (error) {
       console.error('Form submission error:', error);
       setErrors({ submit: 'Network error. Please try again.' });

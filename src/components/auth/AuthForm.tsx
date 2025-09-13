@@ -70,11 +70,14 @@ export function AuthForm({ mode, onToggleMode, onSuccess }: AuthFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('DEBUG FORM: Form submitted', { mode, email: formData.email });
     
     if (!validateForm()) {
+      console.log('DEBUG FORM: Form validation failed');
       return;
     }
 
+    console.log('DEBUG FORM: Form validation passed, starting login/register');
     setLoading(true);
     setErrors([]);
 
@@ -82,24 +85,30 @@ export function AuthForm({ mode, onToggleMode, onSuccess }: AuthFormProps) {
       let result;
       
       if (mode === 'login') {
+        console.log('DEBUG FORM: Calling login function');
         result = await login(formData.email, formData.password);
+        console.log('DEBUG FORM: Login result:', result);
       } else {
+        console.log('DEBUG FORM: Calling register function');
         result = await register(
           formData.email, 
           formData.password, 
           formData.firstName || undefined, 
           formData.lastName || undefined
         );
+        console.log('DEBUG FORM: Register result:', result);
       }
 
       if (result.success) {
+        console.log('DEBUG FORM: Success, clearing form');
         setFormData({ email: '', password: '', firstName: '', lastName: '' });
         onSuccess?.();
       } else {
+        console.log('DEBUG FORM: Failed with error:', result.error);
         setErrors([result.error || `${mode} failed`]);
       }
     } catch (error) {
-      console.error(`${mode} error:`, error);
+      console.error(`DEBUG FORM: Exception during ${mode}:`, error);
       setErrors(['An unexpected error occurred']);
     } finally {
       setLoading(false);

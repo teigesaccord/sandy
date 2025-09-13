@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { User, Edit3, Calendar, Target, Briefcase, MessageSquare, TrendingUp, Award } from 'lucide-react';
 import type { UserProfile } from '../types';
+import PostgreSQLService from '../services/PostgreSQLService';
 
 interface UserProfileCardProps {
   userId: string;
@@ -29,11 +30,8 @@ export function UserProfileCard({ userId, profile, onUpdateProfile, className = 
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/users/${userId}/profile`);
-      if (response.ok) {
-        const data = await response.json();
-        setLocalProfile(data.profile);
-      }
+      const data = await PostgreSQLService.getUserProfile(userId);
+      setLocalProfile(data);
     } catch (error) {
       console.error('Failed to load profile:', error);
     } finally {
