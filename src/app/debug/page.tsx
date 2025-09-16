@@ -83,6 +83,20 @@ export default function DebugPage() {
     }
   };
 
+  const clearTokens = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await PostgreSQLService.clearTokens();
+      setResults({ message: 'Tokens cleared successfully' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      console.error('Clear tokens error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const checkLocalStorage = () => {
     const token = localStorage.getItem('sandy_access');
     const refreshToken = localStorage.getItem('sandy_refresh');
@@ -125,6 +139,10 @@ export default function DebugPage() {
           <button onClick={testQueryParam} disabled={loading} style={{ marginRight: '10px', padding: '10px' }}>
             Test Query Param (bypasses CORS)
           </button>
+          
+          <button onClick={clearTokens} disabled={loading} style={{ marginRight: '10px', padding: '10px' }}>
+            Clear Stored Tokens
+          </button>
         </div>
       </div>
 
@@ -157,6 +175,7 @@ export default function DebugPage() {
           <li>Test Login to get fresh tokens</li>
           <li>Test /me endpoint to see authentication</li>
           <li>Test Query Param method (bypasses CORS entirely)</li>
+          <li>Clear Stored Tokens if you get expired token errors</li>
           <li>Check browser console for detailed logs</li>
         </ol>
       </div>

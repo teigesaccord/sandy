@@ -51,7 +51,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (data) setUser(data);
       else setUser(null);
     } catch (err) {
+      console.log('Auth check failed:', err);
       setUser(null);
+      // Don't redirect here as this runs on page load
     } finally {
       setLoading(false);
     }
@@ -68,15 +70,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
           const me = await PostgreSQLService.me();
           setUser(me || null);
+          return { success: true };
         } catch (err) {
+          console.error('Failed to fetch user after login:', err);
           setUser(null);
+          return { success: false, error: 'Failed to verify login. Please try again.' };
         }
-        return { success: true };
       }
       return { success: false, error: 'Login failed' };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      return { success: false, error: 'Network error occurred' };
+      let errorMessage = 'Network error occurred';
+      if (error.message.includes('400')) {
+        errorMessage = 'Invalid email or password';
+      } else if (error.message.includes('429')) {
+        errorMessage = 'Too many login attempts. Please try again later.';
+      }
+      return { success: false, error: errorMessage };
     }
   };
 
@@ -112,11 +122,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      // Redirect to login page after logout
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   };
 
   const refreshUser = async (): Promise<void> => {
-    await checkAuth();
+    try {
+      await checkAuth();
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+      setUser(null);
+    }
   };
 
   const value: AuthContextType = {

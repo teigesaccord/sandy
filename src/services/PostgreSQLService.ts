@@ -97,27 +97,52 @@ export const PostgreSQLService = {
   },
 
   async login(email: string, password: string) {
-    const data = await request('/api/auth/login/', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-
-    // TokenObtainPairView returns { access, refresh }
-    if (data && data.access) {
+    try {
+      // Clear any existing tokens before login
       try {
-        localStorage.setItem('sandy_access', data.access);
-        if (data.refresh) localStorage.setItem('sandy_refresh', data.refresh);
-        console.log('DEBUG: Tokens stored successfully', {
-          accessTokenLength: data.access.length,
-          hasRefresh: !!data.refresh
-        });
+        localStorage.removeItem('sandy_access');
+        localStorage.removeItem('sandy_refresh');
+        localStorage.removeItem('sandy_user');
       } catch (err) {
-        console.error('DEBUG: Token storage failed', err);
         // ignore storage errors in SSR or private mode
       }
-    }
 
-    return data;
+      const data = await request('/api/auth/login/', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+
+      // TokenObtainPairView returns { access, refresh }
+      if (data && data.access) {
+        try {
+          localStorage.setItem('sandy_access', data.access);
+          if (data.refresh) localStorage.setItem('sandy_refresh', data.refresh);
+          console.log('DEBUG: Tokens stored successfully', {
+            accessTokenLength: data.access.length,
+            hasRefresh: !!data.refresh
+          });
+        } catch (err) {
+          console.error('DEBUG: Token storage failed', err);
+          // ignore storage errors in SSR or private mode
+        }
+      }
+
+      return data;
+    } catch (error) {
+      // Check if error is due to invalid/expired tokens
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('token_not_valid') || errorMessage.includes('Token is invalid or expired')) {
+        console.log('DEBUG: Clearing expired tokens from localStorage');
+        try {
+          localStorage.removeItem('sandy_access');
+          localStorage.removeItem('sandy_refresh');
+          localStorage.removeItem('sandy_user');
+        } catch (err) {
+          // ignore storage errors
+        }
+      }
+      throw error;
+    }
   },
 
   async logout() {
@@ -125,10 +150,32 @@ export const PostgreSQLService = {
     try {
       localStorage.removeItem('sandy_access');
       localStorage.removeItem('sandy_refresh');
+      localStorage.removeItem('sandy_user');
     } catch (err) {
       // ignore
     }
-    return request('/api/auth/logout/', { method: 'POST' });
+    try {
+      return await request('/api/auth/logout/', { method: 'POST' });
+    } catch (err) {
+      // Even if logout endpoint fails, we've cleared local tokens
+      console.log('Logout endpoint failed, but tokens cleared locally');
+    }
+  },
+
+  // Helper function to handle 401 errors globally
+  handleUnauthorized() {
+    try {
+      localStorage.removeItem('sandy_access');
+      localStorage.removeItem('sandy_refresh');
+      localStorage.removeItem('sandy_user');
+    } catch (err) {
+      // ignore storage errors
+    }
+    
+    // Redirect to login page
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
   },
 
   async me(token?: string) {
@@ -143,6 +190,14 @@ export const PostgreSQLService = {
     
     if (!response.ok) {
       const text = await response.text();
+      
+      // Handle 401 Unauthorized - token is invalid/expired
+      if (response.status === 401) {
+        console.log('Token expired or invalid, redirecting to login');
+        this.handleUnauthorized();
+        throw new Error('Authentication expired. Redirecting to login.');
+      }
+      
       throw new Error(`${response.status} ${response.statusText}: ${text}`);
     }
     
@@ -161,10 +216,76 @@ export const PostgreSQLService = {
     
     if (!response.ok) {
       const text = await response.text();
+      
+      // Handle 401 Unauthorized - token is invalid/expired
+      if (response.status === 401) {
+        console.log('Token expired or invalid, redirecting to login');
+        this.handleUnauthorized();
+        throw new Error('Authentication expired. Redirecting to login.');
+      }
+      
       throw new Error(`${response.status} ${response.statusText}: ${text}`);
     }
     
     return response.json();
+  },
+
+  // Token refresh functionality
+  async refreshToken() {
+    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_refresh') : null;
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await fetch(`${API_HOST}/api/auth/token/refresh/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        refresh: refreshToken
+      })
+    });
+
+    if (!response.ok) {
+      // If refresh fails, clear all tokens
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('sandy_access');
+        localStorage.removeItem('sandy_refresh');
+        localStorage.removeItem('sandy_user');
+      }
+      throw new Error('Token refresh failed');
+    }
+
+    const data = await response.json();
+    
+    // Update stored tokens
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sandy_access', data.access);
+      if (data.refresh) {
+        localStorage.setItem('sandy_refresh', data.refresh);
+      }
+    }
+
+    return data.access;
+  },
+
+  // Enhanced getUserProfile with automatic token refresh
+  async getUserProfileWithRefresh(userId: string) {
+    try {
+      return await this.getUserProfile(userId);
+    } catch (error: any) {
+      // If we get 401, try to refresh token and retry
+      if (error.message.includes('401')) {
+        try {
+          await this.refreshToken();
+          return await this.getUserProfile(userId);
+        } catch (refreshError) {
+          throw new Error('Authentication failed. Please login again.');
+        }
+      }
+      throw error;
+    }
   },
 
   async saveUserProfile(userId: string, profile: any) {
@@ -176,12 +297,22 @@ export const PostgreSQLService = {
     const url = `${API_HOST}/api/users/${userId}/profile/?token=${encodeURIComponent(storedToken)}`;
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(profile)
     });
     
     if (!response.ok) {
       const text = await response.text();
+      
+      // Handle 401 Unauthorized - token is invalid/expired
+      if (response.status === 401) {
+        console.log('Token expired or invalid, redirecting to login');
+        this.handleUnauthorized();
+        throw new Error('Authentication expired. Redirecting to login.');
+      }
+      
       throw new Error(`${response.status} ${response.statusText}: ${text}`);
     }
     
@@ -375,6 +506,18 @@ export const PostgreSQLService = {
     } catch (error) {
       console.error('QUERY PARAM TEST failed:', error);
       throw error;
+    }
+  },
+
+  // Clear all stored tokens for debugging
+  async clearTokens() {
+    console.log('CLEAR TOKENS: Removing all stored tokens');
+    try {
+      localStorage.removeItem('sandy_access');
+      localStorage.removeItem('sandy_refresh');
+      console.log('CLEAR TOKENS: Tokens cleared successfully');
+    } catch (err) {
+      console.error('CLEAR TOKENS: Failed to clear tokens', err);
     }
   }
 };

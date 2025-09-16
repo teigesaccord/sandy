@@ -30,15 +30,20 @@ function AuthenticatedHomePage() {
     try {
       const data = await PostgreSQLService.getUserProfile(user.id);
       setUserProfile(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load user profile:', error);
+      // If authentication expired, the service will automatically redirect
+      // Just log the error and clear the profile
+      if (error.message.includes('Authentication expired')) {
+        setUserProfile(null);
+        // logout() will be called by the service's handleUnauthorized method
+      }
     }
   };
 
   const handleLogout = async () => {
-    await logout();
     setUserProfile(null);
-    setCurrentView('welcome');
+    await logout();
   };
 
   const handleIntakeComplete = async (profile: any) => {
