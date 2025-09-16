@@ -254,11 +254,6 @@ ssl/
 # Docker (keep Docker files but ignore runtime data)
 .docker/
 
-# Kubernetes
-k8s/
-*.yaml
-*.yml
-
 # Terraform
 *.tfstate
 *.tfstate.*

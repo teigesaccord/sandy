@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  sandy-chatbot:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/data/production.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-3.5-turbo}
+      - AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
+      - AI_MAX_TOKENS=${AI_MAX_TOKENS:-2000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://yourdomain.com}
+      - RATE_LIMIT_POINTS=${RATE_LIMIT_POINTS:-30}
+      - RATE_LIMIT_DURATION=${RATE_LIMIT_DURATION:-60}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
+      - ENABLE_ANALYTICS=${ENABLE_ANALYTICS:-true}
+      - ENABLE_VOICE_INPUT=${ENABLE_VOICE_INPUT:-true}
+      - ENABLE_WEBSOCKET=${ENABLE_WEBSOCKET:-true}
+      - CONVERSATION_RETENTION_DAYS=${CONVERSATION_RETENTION_DAYS:-90}
+      - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-365}
+      - MAX_MESSAGE_LENGTH=${MAX_MESSAGE_LENGTH:-2000}
+      - MAX_CONVERSATIONS_PER_USER=${MAX_CONVERSATIONS_PER_USER:-50}
+      - CHAT_TIMEOUT_SECONDS=${CHAT_TIMEOUT_SECONDS:-30}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60000}
+    volumes:
+      - sandy_data:/app/data
+      - sandy_logs:/app/logs
+    restart: always
+    networks:
+      - sandy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: always
+    networks:
+      - sandy-network
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+      - sandy_static:/usr/share/nginx/html/static:ro
+    depends_on:
+      - sandy-chatbot
+    restart: always
+    networks:
+      - sandy-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    security_opt:
+      - no-new-privileges:true
+
+  # Log aggregation service
+  fluentd:
+    image: fluent/fluentd:v1.16-alpine
+    volumes:
+      - ./fluentd/conf:/fluentd/etc
+      - sandy_logs:/var/log/sandy:ro
+      - nginx_logs:/var/log/nginx:ro
+    depends_on:
+      - sandy-chatbot
+      - nginx
+    restart: always
+    networks:
+      - sandy-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # Database backup service
+  backup:
+    image: alpine:latest
+    volumes:
+      - sandy_data:/app/data:ro
+      - ./backups:/backups
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+    command: |
+      sh -c '
+        apk add --no-cache sqlite dcron
+        echo "$BACKUP_SCHEDULE cp /app/data/production.db /backups/sandy-backup-$(date +%Y%m%d-%H%M%S).db && find /backups -name \"sandy-backup-*.db\" -mtime +7 -delete" | crontab -
+        crond -f
+      '
+    restart: unless-stopped
+    networks:
+      - sandy-network
+
+  # Monitoring service
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    restart: unless-stopped
+    networks:
+      - sandy-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - sandy-network
+
+volumes:
+  sandy_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${DATA_PATH:-./data}
+      o: bind
+  sandy_logs:
+    driver: local
+  sandy_static:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  sandy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
