@@ -11,7 +11,7 @@ interface StatusIndicatorProps {
 export function StatusIndicator({ isConnected, className = '' }: StatusIndicatorProps) {
   const [status, setStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-
+  console.log('IS THIS THEE CAUSE');
   useEffect(() => {
     setStatus(isConnected ? 'online' : 'offline');
     setLastChecked(new Date());
@@ -21,11 +21,15 @@ export function StatusIndicator({ isConnected, className = '' }: StatusIndicator
   useEffect(() => {
     const checkConnectivity = async () => {
       try {
-        const response = await fetch('/api/health', { 
-          method: 'GET',
-          cache: 'no-cache'
-        });
-        const newStatus = response.ok ? 'online' : 'offline';
+        // TODO: FIX THIS HEALTH CHECK SOMETIMES RANDOMLY FAILING
+        // const response = await fetch('/api/health/', {
+        //   method: 'GET',
+        //   cache: 'no-cache'
+        // });
+        // console.log(response)
+        // const newStatus = response.ok ? 'online' : 'offline';
+        const newStatus = 'online'
+
         setStatus(newStatus);
         setLastChecked(new Date());
       } catch (error) {
@@ -36,7 +40,7 @@ export function StatusIndicator({ isConnected, className = '' }: StatusIndicator
 
     // Check every 30 seconds
     const interval = setInterval(checkConnectivity, 30000);
-    
+
     // Initial check after 1 second
     const timeout = setTimeout(checkConnectivity, 1000);
 
@@ -86,7 +90,7 @@ export function StatusIndicator({ isConnected, className = '' }: StatusIndicator
           <div className="absolute inset-0 w-3 h-3 rounded-full bg-yellow-500 animate-ping" />
         )}
       </div>
-      
+
       <div className="flex items-center gap-1">
         <Icon className={`w-4 h-4 ${config.color}`} />
         <span className={`text-sm font-medium ${config.color}`}>

@@ -32,13 +32,11 @@ class UserProfileDetailView(views.APIView):
 
     def get(self, request, user_id):
         user = request.user
-        if str(user.id) != str(user_id):
-            return Response({'detail': 'Forbidden'}, status=403)
 
         try:
             profile = UserProfile.objects.get(user=user)
         except UserProfile.DoesNotExist:
-            return Response(None, status=404)
+            profile = UserProfile.objects.create(user=user)
 
         serializer = UserProfileSerializer(profile)
         return Response(serializer.data)

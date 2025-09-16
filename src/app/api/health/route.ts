@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const responseStatus = dbStatus === 'healthy' || dbStatus === 'ok' ? 200 : 503;
 
     return NextResponse.json(healthStatus, { status: responseStatus });
-    
+
   } catch (error) {
     console.error('Health check failed:', error);
     return NextResponse.json(

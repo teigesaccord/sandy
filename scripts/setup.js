@@ -141,7 +141,10 @@ async function checkDependencies() {
       await fs.access(nodeModulesPath);
       console.log('✅ Dependencies are installed');
     } catch {
-      console.log('⚠️  Dependencies not installed. Run "npm install" first.');
+      console.log('⚠️  Dependencies not installed. Running "npm install"...');
+      const { execSync } = require('child_process');
+      execSync('npm install', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
+      console.log('✅ Dependencies installed');
     }
     
     // Check for critical dependencies
@@ -152,11 +155,15 @@ async function checkDependencies() {
       'pg',
       'bcryptjs',
       'jsonwebtoken',
-      'ws'
+      'ws',
+      'next'
     ];
     
     for (const dep of criticalDeps) {
-      if (!packageJson.dependencies[dep]) {
+      if (
+        !(packageJson.dependencies && packageJson.dependencies[dep]) &&
+        !(packageJson.devDependencies && packageJson.devDependencies[dep])
+      ) {
         console.log(`⚠️  Missing critical dependency: ${dep}`);
       }
     }

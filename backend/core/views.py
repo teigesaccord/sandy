@@ -11,4 +11,5 @@ def custom_500(request):
 
 
 def health(request):
+    print('\n\n\n\nis this getting here?')
     return JsonResponse({'status': 'ok'})

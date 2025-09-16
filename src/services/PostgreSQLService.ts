@@ -27,17 +27,6 @@ async function request(path: string, options: RequestInit = {}) {
   const storedAccess = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
   const authHeader = storedAccess ? { 'X-Auth-Token': storedAccess } : {};
 
-  // Debug logging
-  if (path.includes('/me/')) {
-    console.log('DEBUG: Making request to /me/', {
-      hasStoredToken: !!storedAccess,
-      tokenLength: storedAccess ? storedAccess.length : 0,
-      authHeader: authHeader,
-      storedToken: storedAccess ? storedAccess.substring(0, 50) + '...' : 'none',
-      fullAuthHeader: authHeader['X-Auth-Token'] || 'none'
-    });
-  }
-
   // Build headers with correct typing for fetch
   const baseHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -45,38 +34,16 @@ async function request(path: string, options: RequestInit = {}) {
     ...((options.headers as Record<string, string>) || {})
   };
 
-  // Debug final headers for /me/ requests
-  if (path.includes('/me/')) {
-    console.log('DEBUG: Final headers for /me/ request:', baseHeaders);
-  }
-
-  // Debug the actual fetch request for /me/ calls
-  if (path.includes('/me/')) {
-    console.log('DEBUG: About to make fetch request:', {
-      url: url,
-      method: options.method || 'GET',
-      headers: baseHeaders,
-      fullOptions: { headers: baseHeaders as HeadersInit, ...options }
-    });
-  }
-
+  console.log(url);
   const res = await fetch(url, {
+    method: options.method || 'GET',
     headers: baseHeaders as HeadersInit,
     ...options
   });
+  console.log(res);
 
   if (!res.ok) {
     const text = await res.text();
-    // Enhanced error logging for /me/ requests
-    if (path.includes('/me/')) {
-      console.error('DEBUG: /me/ request failed:', {
-        status: res.status,
-        statusText: res.statusText,
-        responseText: text,
-        requestHeaders: baseHeaders,
-        responseHeaders: Object.fromEntries(res.headers.entries())
-      });
-    }
     throw new Error(`${res.status} ${res.statusText}: ${text}`);
   }
 
@@ -171,7 +138,7 @@ export const PostgreSQLService = {
     } catch (err) {
       // ignore storage errors
     }
-    
+
     // Redirect to login page
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
@@ -184,23 +151,23 @@ export const PostgreSQLService = {
     if (!storedToken) {
       throw new Error('No authentication token available');
     }
-    
+
     const url = `${API_HOST}/api/auth/simple-me/?token=${encodeURIComponent(storedToken)}`;
     const response = await fetch(url, { method: 'GET' });
-    
+
     if (!response.ok) {
       const text = await response.text();
-      
+
       // Handle 401 Unauthorized - token is invalid/expired
       if (response.status === 401) {
         console.log('Token expired or invalid, redirecting to login');
         this.handleUnauthorized();
         throw new Error('Authentication expired. Redirecting to login.');
       }
-      
+
       throw new Error(`${response.status} ${response.statusText}: ${text}`);
     }
-    
+
     return response.json();
   },
 
@@ -210,23 +177,23 @@ export const PostgreSQLService = {
     if (!storedToken) {
       throw new Error('No authentication token available');
     }
-    
+
     const url = `${API_HOST}/api/users/${userId}/profile/?token=${encodeURIComponent(storedToken)}`;
     const response = await fetch(url, { method: 'GET' });
-    
+
     if (!response.ok) {
       const text = await response.text();
-      
+
       // Handle 401 Unauthorized - token is invalid/expired
       if (response.status === 401) {
         console.log('Token expired or invalid, redirecting to login');
         this.handleUnauthorized();
         throw new Error('Authentication expired. Redirecting to login.');
       }
-      
+
       throw new Error(`${response.status} ${response.statusText}: ${text}`);
     }
-    
+
     return response.json();
   },
 
@@ -258,7 +225,7 @@ export const PostgreSQLService = {
     }
 
     const data = await response.json();
-    
+
     // Update stored tokens
     if (typeof window !== 'undefined') {
       localStorage.setItem('sandy_access', data.access);
@@ -293,7 +260,7 @@ export const PostgreSQLService = {
     if (!storedToken) {
       throw new Error('No authentication token available');
     }
-    
+
     const url = `${API_HOST}/api/users/${userId}/profile/?token=${encodeURIComponent(storedToken)}`;
     const response = await fetch(url, {
       method: 'PUT',
@@ -302,20 +269,20 @@ export const PostgreSQLService = {
       },
       body: JSON.stringify(profile)
     });
-    
+
     if (!response.ok) {
       const text = await response.text();
-      
+
       // Handle 401 Unauthorized - token is invalid/expired
       if (response.status === 401) {
         console.log('Token expired or invalid, redirecting to login');
         this.handleUnauthorized();
         throw new Error('Authentication expired. Redirecting to login.');
       }
-      
+
       throw new Error(`${response.status} ${response.statusText}: ${text}`);
     }
-    
+
     return response.json();
   },
 
@@ -360,21 +327,21 @@ export const PostgreSQLService = {
 
   // Health
   async health() {
-    return request('/api/health/');
+    return request('/api/health/', {method: 'GET'});
   },
 
   // Test method to manually test /me/ endpoint
   async testMe() {
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
     console.log('DEBUG testMe: stored token:', storedToken ? storedToken.substring(0, 50) + '...' : 'none');
-    
+
     if (!storedToken) {
       throw new Error('No stored token found');
     }
 
     const url = API_HOST + '/api/auth/me/';
     console.log('DEBUG testMe: making direct fetch to:', url);
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -402,28 +369,28 @@ export const PostgreSQLService = {
   async debugHeaders() {
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
     console.log('DEBUG debugHeaders: stored token:', storedToken ? storedToken.substring(0, 50) + '...' : 'none');
-    
+
     const url = API_HOST + '/api/auth/debug-headers/';
     console.log('DEBUG debugHeaders: making request to:', url);
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Origin': 'http://localhost:3000'
     };
-    
+
     if (storedToken) {
       headers['X-Auth-Token'] = storedToken;
     }
-    
+
     console.log('DEBUG debugHeaders: sending headers:', headers);
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: headers
     });
 
     console.log('DEBUG debugHeaders: response status:', response.status);
-    
+
     if (!response.ok) {
       const text = await response.text();
       console.error('DEBUG debugHeaders: error response:', text);
@@ -438,16 +405,16 @@ export const PostgreSQLService = {
   // Minimal test to see what headers get through
   async simpleTest() {
     console.log('SIMPLE TEST: Starting basic header test...');
-    
+
     const url = API_HOST + '/api/auth/debug-headers/';
-    
+
     try {
       // Test 1: No headers
       console.log('SIMPLE TEST 1: No custom headers');
       const response1 = await fetch(url);
       const data1 = await response1.json();
       console.log('SIMPLE TEST 1 result:', data1);
-      
+
       // Test 2: Simple custom header
       console.log('SIMPLE TEST 2: Simple custom header');
       const response2 = await fetch(url, {
@@ -457,7 +424,7 @@ export const PostgreSQLService = {
       });
       const data2 = await response2.json();
       console.log('SIMPLE TEST 2 result:', data2);
-      
+
       // Test 3: X-Auth-Token header
       console.log('SIMPLE TEST 3: X-Auth-Token header');
       const response3 = await fetch(url, {
@@ -467,7 +434,7 @@ export const PostgreSQLService = {
       });
       const data3 = await response3.json();
       console.log('SIMPLE TEST 3 result:', data3);
-      
+
       return { test1: data1, test2: data2, test3: data3 };
     } catch (error) {
       console.error('SIMPLE TEST failed:', error);
@@ -478,7 +445,7 @@ export const PostgreSQLService = {
   // Test using query parameters (bypasses CORS entirely)
   async queryParamTest() {
     console.log('QUERY PARAM TEST: Testing token via query parameter...');
-    
+
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
     if (!storedToken) {
       throw new Error('No stored token found');
@@ -486,14 +453,14 @@ export const PostgreSQLService = {
 
     const url = `${API_HOST}/api/auth/simple-me/?token=${encodeURIComponent(storedToken)}`;
     console.log('QUERY PARAM TEST: Making request to:', url);
-    
+
     try {
       const response = await fetch(url, {
         method: 'GET'
       });
 
       console.log('QUERY PARAM TEST: Response status:', response.status);
-      
+
       if (!response.ok) {
         const text = await response.text();
         console.error('QUERY PARAM TEST: Error response:', text);
