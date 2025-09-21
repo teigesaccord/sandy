@@ -25,17 +25,29 @@ function AuthenticatedProfilePage() {
     
     setIsLoading(true);
     try {
-      const data = await PostgreSQLService.getUserProfile(user.id);
-      setUserProfile(data);
-      // If profile is incomplete, start in editing mode
-      if (!data || data.intakeStatus?.completionPercentage < 50) {
-        setIsEditing(true);
+      const response = await fetch(`/api/users/${user.id}/profile`, {
+        method: 'GET',
+        credentials: 'include' // Include HTTP-only cookies for authentication
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data.profile);
+        // If profile is incomplete, start in editing mode
+        if (!data.profile || data.profile.intakeStatus?.completionPercentage < 50) {
+          setIsEditing(true);
+        }
+      } else if (response.status === 401) {
+        // Authentication expired
+        console.log('Authentication expired, logging out...');
+        logout();
+      } else {
+        console.error('Failed to load user profile:', response.status, response.statusText);
+        setUserProfile(null);
       }
     } catch (error: any) {
       console.error('Failed to load user profile:', error);
-      if (error.message.includes('Authentication expired')) {
-        setUserProfile(null);
-      }
+      setUserProfile(null);
     } finally {
       setIsLoading(false);
     }

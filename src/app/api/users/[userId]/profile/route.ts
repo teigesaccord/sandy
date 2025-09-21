@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, handleApiError, getCorsHeaders } from '../../../../../lib/services';
 import { UserProfile } from '../../../../../models/UserProfile';
-import PostgreSQLService from '../../../../../services/PostgreSQLService';
-import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
+import { requireAuth, type AuthenticatedRequest, extractTokenFromRequest } from '../../../../../lib/auth';
 
 // Use frontend HTTP proxy to talk to Django backend
 
@@ -40,19 +39,53 @@ export const GET = requireAuth(async (request: NextRequest, { params }: { params
       );
     }
 
-  const profile = await PostgreSQLService.getUserProfile(userId);
-
-    if (!profile) {
+    // Get JWT token for Django API call
+    const token = extractTokenFromRequest(request);
+    if (!token) {
       return NextResponse.json(
-        { error: 'Profile not found' },
-        { status: 404, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Authentication token missing' },
+        { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
-    return NextResponse.json(
-      { profile: profile.toJSON() },
-      { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
-    );
+    // Call Django backend directly
+    try {
+      const apiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+      const djangoUrl = `${apiHost}/api/users/${userId}/profile/`;
+      
+      const djangoResponse = await fetch(djangoUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!djangoResponse.ok) {
+        if (djangoResponse.status === 404) {
+          return NextResponse.json(
+            { error: 'Profile not found' },
+            { status: 404, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+          );
+        }
+        return NextResponse.json(
+          { error: 'Failed to fetch profile from backend' },
+          { status: djangoResponse.status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        );
+      }
+
+      const profileData = await djangoResponse.json();
+      return NextResponse.json(
+        { profile: profileData },
+        { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    } catch (error) {
+      console.error('Error calling Django backend:', error);
+      return NextResponse.json(
+        { error: 'Backend service unavailable' },
+        { status: 503, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    }
 
   } catch (error) {
     const { message, status } = handleApiError(error);
@@ -108,15 +141,17 @@ export const POST = requireAuth(async (request: NextRequest, { params }: { param
       );
     }
 
-  // Get existing profile or create new one via backend
-  let profile = await PostgreSQLService.getUserProfile(userId);
-    if (profile) {
-      profile.update(profileData);
-    } else {
-      profile = new UserProfile({ ...profileData, userId });
+    // Get JWT token for Django API call
+    const token = extractTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication token missing' },
+        { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
     }
 
-    // Validate profile
+    // Validate profile data
+    const profile = new UserProfile({ ...profileData, userId });
     const validation = profile.validate();
     if (!validation.isValid) {
       return NextResponse.json(
@@ -125,14 +160,41 @@ export const POST = requireAuth(async (request: NextRequest, { params }: { param
       );
     }
 
-  // Save profile and record interaction via backend
-  await PostgreSQLService.saveUserProfile(userId, profile);
-  await PostgreSQLService.recordInteraction(userId, 'profile_update', { timestamp: (new Date()).toISOString() });
+    // Save profile via Django backend
+    try {
+      const apiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+      const djangoUrl = `${apiHost}/api/users/${userId}/profile/`;
+      
+      const djangoResponse = await fetch(djangoUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(profileData)
+      });
 
-    return NextResponse.json(
-      { profile: profile.toJSON() },
-      { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
-    );
+      if (!djangoResponse.ok) {
+        const errorText = await djangoResponse.text();
+        console.error('Django profile save failed:', djangoResponse.status, errorText);
+        return NextResponse.json(
+          { error: 'Failed to save profile to backend' },
+          { status: djangoResponse.status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        );
+      }
+
+      const savedProfile = await djangoResponse.json();
+      return NextResponse.json(
+        { profile: savedProfile },
+        { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    } catch (error) {
+      console.error('Error calling Django backend for profile save:', error);
+      return NextResponse.json(
+        { error: 'Backend service unavailable' },
+        { status: 503, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    }
 
   } catch (error) {
     const { message, status } = handleApiError(error);
@@ -179,19 +241,46 @@ export const DELETE = requireAuth(async (request: NextRequest, { params }: { par
       );
     }
 
-  const success = await PostgreSQLService.deleteUserProfile(userId);
-
-    if (!success) {
+    // Get JWT token for Django API call
+    const token = extractTokenFromRequest(request);
+    if (!token) {
       return NextResponse.json(
-        { error: 'Failed to delete profile' },
-        { status: 500, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        { error: 'Authentication token missing' },
+        { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
     }
 
-    return NextResponse.json(
-      { message: 'Profile deleted successfully' },
-      { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
-    );
+    // Delete profile via Django backend
+    try {
+      const apiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+      const djangoUrl = `${apiHost}/api/users/${userId}/profile/`;
+      
+      const djangoResponse = await fetch(djangoUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!djangoResponse.ok) {
+        return NextResponse.json(
+          { error: 'Failed to delete profile from backend' },
+          { status: djangoResponse.status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        );
+      }
+
+      return NextResponse.json(
+        { message: 'Profile deleted successfully' },
+        { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    } catch (error) {
+      console.error('Error calling Django backend for profile delete:', error);
+      return NextResponse.json(
+        { error: 'Backend service unavailable' },
+        { status: 503, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    }
 
   } catch (error) {
     const { message, status } = handleApiError(error);

@@ -6,7 +6,7 @@
 
 // Ensure we have an absolute host for server-side requests during build/export.
 // NEXT_PUBLIC_API_HOST is used in the browser; API_HOST falls back to API_HOST or localhost:8000 for Django.
-let API_HOST = (process.env.NEXT_PUBLIC_API_HOST || process.env.API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+let API_HOST = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
 
 // Sanitize local development hosts: if someone mistakenly set https://localhost:8000
 // force plain http so fetch doesn't attempt TLS against a non-TLS dev server.
@@ -22,7 +22,15 @@ try {
 }
 
 async function request(path: string, options: RequestInit = {}) {
-  const url = API_HOST + path;
+  // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+  const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+  const url = resolvedApiHost + path;
+  
+  console.log('🔍 SERVICE DEBUG: Resolved API_HOST =', resolvedApiHost);
+  console.log('🔍 SERVICE DEBUG: Full URL =', url);
+  console.log('🔍 SERVICE DEBUG: Environment check - API_HOST =', process.env.API_HOST);
+  console.log('🔍 SERVICE DEBUG: Environment check - NEXT_PUBLIC_API_HOST =', process.env.NEXT_PUBLIC_API_HOST);
+  
   // Automatically attach stored access token (if present) using X-Auth-Token to bypass CORS issues
   const storedAccess = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
   const authHeader = storedAccess ? { 'X-Auth-Token': storedAccess } : {};
@@ -34,7 +42,8 @@ async function request(path: string, options: RequestInit = {}) {
     ...((options.headers as Record<string, string>) || {})
   };
 
-  console.log(url);
+  console.log('🔍 SERVICE DEBUG: Final URL:', url);
+
   const res = await fetch(url, {
     method: options.method || 'GET',
     headers: baseHeaders as HeadersInit,
@@ -146,13 +155,15 @@ export const PostgreSQLService = {
   },
 
   async me(token?: string) {
-    // Use query parameter to bypass CORS issues
+    // Call Django backend directly to validate token
     const storedToken = token || (typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null);
     if (!storedToken) {
       throw new Error('No authentication token available');
     }
 
-    const url = `${API_HOST}/api/auth/simple-me/?token=${encodeURIComponent(storedToken)}`;
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${resolvedApiHost}/api/auth/simple-me/?token=${encodeURIComponent(storedToken)}`;
     const response = await fetch(url, { method: 'GET' });
 
     if (!response.ok) {
@@ -172,14 +183,23 @@ export const PostgreSQLService = {
   },
 
   // Profiles
-  async getUserProfile(userId: string) {
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
-    if (!storedToken) {
+  async getUserProfile(userId: string, token?: string) {
+    // Use provided token (server-side) or fallback to localStorage (client-side)
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null);
+    if (!authToken) {
       throw new Error('No authentication token available');
     }
 
-    const url = `${API_HOST}/api/users/${userId}/profile/?token=${encodeURIComponent(storedToken)}`;
-    const response = await fetch(url, { method: 'GET' });
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${resolvedApiHost}/api/users/${userId}/profile/`;
+    const response = await fetch(url, { 
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
     if (!response.ok) {
       const text = await response.text();
@@ -197,74 +217,22 @@ export const PostgreSQLService = {
     return response.json();
   },
 
-  // Token refresh functionality
-  async refreshToken() {
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_refresh') : null;
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
 
-    const response = await fetch(`${API_HOST}/api/auth/token/refresh/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        refresh: refreshToken
-      })
-    });
 
-    if (!response.ok) {
-      // If refresh fails, clear all tokens
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('sandy_access');
-        localStorage.removeItem('sandy_refresh');
-        localStorage.removeItem('sandy_user');
-      }
-      throw new Error('Token refresh failed');
-    }
-
-    const data = await response.json();
-
-    // Update stored tokens
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('sandy_access', data.access);
-      if (data.refresh) {
-        localStorage.setItem('sandy_refresh', data.refresh);
-      }
-    }
-
-    return data.access;
-  },
-
-  // Enhanced getUserProfile with automatic token refresh
-  async getUserProfileWithRefresh(userId: string) {
-    try {
-      return await this.getUserProfile(userId);
-    } catch (error: any) {
-      // If we get 401, try to refresh token and retry
-      if (error.message.includes('401')) {
-        try {
-          await this.refreshToken();
-          return await this.getUserProfile(userId);
-        } catch (refreshError) {
-          throw new Error('Authentication failed. Please login again.');
-        }
-      }
-      throw error;
-    }
-  },
-
-  async saveUserProfile(userId: string, profile: any) {
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null;
-    if (!storedToken) {
+  async saveUserProfile(userId: string, profile: any, token?: string) {
+    // Use provided token (server-side) or fallback to localStorage (client-side)
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null);
+    if (!authToken) {
       throw new Error('No authentication token available');
     }
 
-    const url = `${API_HOST}/api/users/${userId}/profile/?token=${encodeURIComponent(storedToken)}`;
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${resolvedApiHost}/api/users/${userId}/profile/`;
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
+        'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(profile)
@@ -287,11 +255,37 @@ export const PostgreSQLService = {
   },
 
   // Conversations
-  async saveConversation(userId: string, messageType: string, messageText: string, contextData?: any) {
-    return request(`/api/users/${userId}/chat/`, {
+  async saveConversation(userId: string, messageType: string, messageText: string, contextData?: any, token?: string) {
+    // Use provided token (server-side) or fallback to localStorage (client-side)
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null);
+    if (!authToken) {
+      throw new Error('No authentication token available');
+    }
+
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${resolvedApiHost}/api/users/${userId}/chat/`;
+    const response = await fetch(url, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ message_type: messageType, message_text: messageText, context_data: contextData })
     });
+
+    if (!response.ok) {
+      const text = await response.text();
+      // Handle 401 Unauthorized - token is invalid/expired
+      if (response.status === 401) {
+        console.log('Token expired or invalid, redirecting to login');
+        this.handleUnauthorized();
+        throw new Error('Authentication expired. Redirecting to login.');
+      }
+      throw new Error(`${response.status} ${response.statusText}: ${text}`);
+    }
+
+    return response.json();
   },
 
   async getConversationHistory(userId: string, limit: number = 50) {
@@ -310,19 +304,73 @@ export const PostgreSQLService = {
     });
   },
 
-  async recordInteraction(userId: string, interactionType: string, interactionData?: any) {
-    return request(`/api/users/${userId}/interactions/`, {
+  async recordInteraction(userId: string, interactionType: string, interactionData?: any, token?: string) {
+    // Use provided token (server-side) or fallback to localStorage (client-side)
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null);
+    if (!authToken) {
+      throw new Error('No authentication token available');
+    }
+
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${resolvedApiHost}/api/users/${userId}/interactions/`;
+    const response = await fetch(url, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ interaction_type: interactionType, interaction_data: interactionData })
     });
+
+    if (!response.ok) {
+      const text = await response.text();
+      // Handle 401 Unauthorized - token is invalid/expired
+      if (response.status === 401) {
+        console.log('Token expired or invalid, redirecting to login');
+        this.handleUnauthorized();
+        throw new Error('Authentication expired. Redirecting to login.');
+      }
+      throw new Error(`${response.status} ${response.statusText}: ${text}`);
+    }
+
+    return response.json();
   },
 
   async deleteUserProfile(userId: string) {
     return request(`/api/users/${userId}/profile/`, { method: 'DELETE' });
   },
 
-  async clearConversationHistory(userId: string) {
-    return request(`/api/users/${userId}/conversation/`, { method: 'DELETE' });
+  async clearConversationHistory(userId: string, token?: string) {
+    // Use provided token (server-side) or fallback to localStorage (client-side)
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('sandy_access') : null);
+    if (!authToken) {
+      throw new Error('No authentication token available');
+    }
+
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const resolvedApiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${resolvedApiHost}/api/users/${userId}/conversation/`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      // Handle 401 Unauthorized - token is invalid/expired
+      if (response.status === 401) {
+        console.log('Token expired or invalid, redirecting to login');
+        this.handleUnauthorized();
+        throw new Error('Authentication expired. Redirecting to login.');
+      }
+      throw new Error(`${response.status} ${response.statusText}: ${text}`);
+    }
+
+    return response.json();
   },
 
   // Health
@@ -478,13 +526,24 @@ export const PostgreSQLService = {
 
   // Clear all stored tokens for debugging
   async clearTokens() {
-    console.log('CLEAR TOKENS: Removing all stored tokens');
+    console.log('CLEAR TOKENS: Clearing authentication tokens and cookies...');
+    
+    // Clear localStorage tokens
     try {
       localStorage.removeItem('sandy_access');
       localStorage.removeItem('sandy_refresh');
-      console.log('CLEAR TOKENS: Tokens cleared successfully');
+      localStorage.removeItem('sandy_user');
+      console.log('CLEAR TOKENS: LocalStorage tokens cleared');
     } catch (err) {
-      console.error('CLEAR TOKENS: Failed to clear tokens', err);
+      console.error('CLEAR TOKENS: Error clearing localStorage tokens:', err);
+    }
+    
+    // Clear HTTP-only cookies via logout endpoint
+    try {
+      await this.logout();
+      console.log('CLEAR TOKENS: HTTP-only cookies cleared successfully');
+    } catch (err) {
+      console.error('CLEAR TOKENS: Error clearing HTTP-only cookies:', err);
     }
   }
 };

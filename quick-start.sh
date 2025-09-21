@@ -136,9 +136,9 @@ create_env_file() {
 
   # Server-side API_HOST (used during SSR/build) – pointing at backend container or localhost is acceptable for dev
   if ! grep -q "^API_HOST=" "${ENV_FILE}" 2>/dev/null; then
-    echo "API_HOST=http://backend:8000" >> "${ENV_FILE}"
+    echo "API_HOST=http://localhost:8000" >> "${ENV_FILE}"
   else
-    sed -i.bak "s|^API_HOST=.*|API_HOST=http://backend:8000|" "${ENV_FILE}" || true
+    sed -i.bak "s|^API_HOST=.*|API_HOST=http://localhost:8000|" "${ENV_FILE}" || true
     rm -f "${ENV_FILE}.bak"
   fi
 

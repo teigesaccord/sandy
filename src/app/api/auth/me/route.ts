@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import PostgreSQLService from '../../../../services/PostgreSQLService';
-import { requireAuth } from '../../../../lib/auth';
+import { requireAuth, extractTokenFromRequest } from '../../../../lib/auth';
 import { getCorsHeaders } from '../../../../lib/services';
 import type { AuthenticatedRequest } from '../../../../lib/auth';
 
@@ -10,8 +9,30 @@ export const GET = requireAuth(async (request: NextRequest) => {
     const user = authRequest.user!;
 
     try {
-      // Get user's profile via backend
-      const profile = await PostgreSQLService.getUserProfile(user.id);
+      // Get user's profile via Django backend directly
+      const token = extractTokenFromRequest(request);
+      if (!token) {
+        return NextResponse.json(
+          { error: 'Authentication token missing' },
+          { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        );
+      }
+
+      const apiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+      const profileUrl = `${apiHost}/api/users/${user.id}/profile/?token=${encodeURIComponent(token)}`;
+      
+      const profileResponse = await fetch(profileUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      let profile = null;
+      if (profileResponse.ok) {
+        profile = await profileResponse.json();
+      }
 
       return NextResponse.json(
         {
@@ -24,7 +45,7 @@ export const GET = requireAuth(async (request: NextRequest) => {
             createdAt: (user as any).created_at,
             updatedAt: (user as any).updated_at
           },
-          profile: profile ? profile.toJSON() : null,
+          profile: profile,
           hasProfile: !!profile
         },
         {

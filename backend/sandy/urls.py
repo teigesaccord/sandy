@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/profiles/', include('profiles.urls')),
     path('api/chat/', include('chat.urls')),
+    path('api/users/<int:user_id>/chat/', include('chat.urls')),  # User-specific chat endpoint
     path('api/recommendations/', include('recommendations.urls')),
     path('api/intake/', include('intake.urls')),
     path('api/', include('core.urls')),  # Health check and other core endpoints

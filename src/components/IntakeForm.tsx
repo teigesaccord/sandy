@@ -47,10 +47,22 @@ export function IntakeForm({ userId, onComplete, onBack, className = '' }: Intak
 
   const loadUserProfile = async () => {
     try {
-      const data = await PostgreSQLService.getUserProfile(userId);
-      setUserProfile(data);
-      // Pre-populate form with existing data
-      populateFormFromProfile(data);
+      const response = await fetch(`/api/users/${userId}/profile`, {
+        method: 'GET',
+        credentials: 'include' // Include HTTP-only cookies for authentication
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data.profile);
+        // Pre-populate form with existing data
+        populateFormFromProfile(data.profile);
+      } else if (response.status === 401) {
+        // Authentication expired
+        console.log('Authentication expired in IntakeForm');
+      } else {
+        console.error('Failed to load user profile:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error('Failed to load user profile:', error);
     }
@@ -201,9 +213,27 @@ export function IntakeForm({ userId, onComplete, onBack, className = '' }: Intak
       const profileUpdates = convertFormDataToProfile(formData);
       
       // Submit to API
-      const result = await PostgreSQLService.saveUserProfile(userId, profileUpdates);
-      setUserProfile(result);
-      onComplete(result);
+      const response = await fetch(`/api/users/${userId}/profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Include HTTP-only cookies for authentication
+        body: JSON.stringify(profileUpdates)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data.profile);
+        onComplete(data.profile);
+      } else if (response.status === 401) {
+        // Authentication expired
+        console.log('Authentication expired during profile save');
+        setErrors({ submit: 'Authentication expired. Please login again.' });
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        setErrors({ submit: errorData.error || 'Failed to save profile. Please try again.' });
+      }
     } catch (error) {
       console.error('Form submission error:', error);
       setErrors({ submit: 'Network error. Please try again.' });

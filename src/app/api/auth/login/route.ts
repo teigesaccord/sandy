@@ -65,8 +65,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      console.log('🔍 LOGIN DEBUG: Attempting login for email:', email.toLowerCase().trim());
       // Call backend auth endpoint via proxy
       const result = await PostgreSQLService.login(email.toLowerCase().trim(), password);
+      console.log('🔍 LOGIN DEBUG: Backend login result:', result ? 'success' : 'failed');
+      console.log('🔍 LOGIN DEBUG: Result has token:', !!result?.token);
+      console.log('🔍 LOGIN DEBUG: Result has access:', !!result?.access);
+      console.log('🔍 LOGIN DEBUG: Full result structure:', result);
 
       // Clear rate limit on successful login
       clearAuthRateLimit(`login_${clientIP}`);
@@ -82,14 +87,32 @@ export async function POST(request: NextRequest) {
         console.warn('Failed to record login interaction', ie);
       }
 
+      // Use the access token from Django response (Django returns 'access' field)
+      const token = result.access || result.token;
+      console.log('🔍 LOGIN DEBUG: Using token for cookie:', token ? token.substring(0, 50) + '...' : 'none');
+      
+      if (!token) {
+        console.error('🔍 LOGIN DEBUG: No token found in Django response');
+        return NextResponse.json(
+          { error: 'Login failed - no token received' },
+          { 
+            status: 500,
+            headers: getCorsHeaders(request.headers.get('origin') || undefined)
+          }
+        );
+      }
+
       // Return response and set auth cookie using token from backend
-      return createAuthResponse(
+      const response = createAuthResponse(
         {
           message: 'Login successful',
           user: result.user
         },
-        result.token
+        token
       );
+      
+      console.log('🔍 LOGIN DEBUG: Auth cookie set successfully');
+      return response;
 
     } catch (error) {
       console.error('Login error:', error);

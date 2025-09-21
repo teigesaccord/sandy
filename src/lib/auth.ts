@@ -18,47 +18,83 @@ export interface AuthenticatedRequest extends NextRequest {
 
 export async function verifyToken(token: string): Promise<AuthenticatedUser | null> {
   try {
-  // Ask backend to validate the token and return user info
-  const me = await PostgreSQLService.me(token);
-  if (!me || !me.id) return null;
-  return me as AuthenticatedUser;
+    console.log('🔍 AUTH DEBUG: verifyToken called with token:', token.substring(0, 50) + '...');
+    // Call Django backend directly with token to validate
+    // For server-side calls, prioritize API_HOST (Docker: backend:8000), then fall back to NEXT_PUBLIC_API_HOST (browser: localhost:8000)
+    const apiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+    const url = `${apiHost}/api/auth/simple-me/?token=${encodeURIComponent(token)}`;
+    console.log('🔍 AUTH DEBUG: Using API host:', apiHost);
+    console.log('🔍 AUTH DEBUG: Making request to Django:', url);
+    const response = await fetch(url, { method: 'GET' });
+    
+    console.log('🔍 AUTH DEBUG: Django response status:', response.status);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('🔍 AUTH DEBUG: Token verification failed:', response.status, errorText);
+      return null;
+    }
+    
+    const userData = await response.json();
+    console.log('🔍 AUTH DEBUG: Django user data:', userData);
+    if (!userData || !userData.id) {
+      console.error('🔍 AUTH DEBUG: Invalid user data received from Django');
+      return null;
+    }
+    console.log('🔍 AUTH DEBUG: Token verification successful for user:', userData.id);
+    return userData as AuthenticatedUser;
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('🔍 AUTH DEBUG: Token verification error:', error);
     return null;
   }
 }
 
 export function extractTokenFromRequest(request: NextRequest): string | null {
+  console.log('🔍 AUTH DEBUG: extractTokenFromRequest called for path:', request.url);
+  
   // Try Authorization header first
   const authHeader = request.headers.get('Authorization');
+  console.log('🔍 AUTH DEBUG: Authorization header:', authHeader ? authHeader.substring(0, 50) + '...' : 'not found');
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
+    const token = authHeader.substring(7);
+    console.log('🔍 AUTH DEBUG: Found token in Authorization header:', token.substring(0, 50) + '...');
+    return token;
   }
 
   // Try cookie as fallback
   const cookie = request.cookies.get('auth-token');
+  console.log('🔍 AUTH DEBUG: auth-token cookie:', cookie ? cookie.value.substring(0, 50) + '...' : 'not found');
+  console.log('🔍 AUTH DEBUG: All cookies:', request.cookies.getAll().map(c => c.name));
   if (cookie) {
+    console.log('🔍 AUTH DEBUG: Found token in cookie:', cookie.value.substring(0, 50) + '...');
     return cookie.value;
   }
 
+  console.log('🔍 AUTH DEBUG: No token found in headers or cookies');
   return null;
 }
 
 export async function authenticate(request: NextRequest): Promise<AuthenticatedUser | null> {
+  console.log('🔍 AUTH DEBUG: authenticate called for path:', request.url);
   const token = extractTokenFromRequest(request);
   
   if (!token) {
+    console.log('🔍 AUTH DEBUG: No token found, authentication failed');
     return null;
   }
 
-  return await verifyToken(token);
+  console.log('🔍 AUTH DEBUG: Token found, verifying...');
+  const user = await verifyToken(token);
+  console.log('🔍 AUTH DEBUG: Token verification result:', user ? `user ${user.id}` : 'failed');
+  return user;
 }
 
 export function requireAuth(handler: (request: NextRequest, context?: any) => Promise<NextResponse>) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+    console.log('🔍 AUTH DEBUG: requireAuth called for path:', request.url);
     const user = await authenticate(request);
 
     if (!user) {
+      console.log('🔍 AUTH DEBUG: Authentication failed, returning 401');
       return NextResponse.json(
         { error: 'Authentication required' },
         { 
@@ -73,6 +109,7 @@ export function requireAuth(handler: (request: NextRequest, context?: any) => Pr
       );
     }
 
+    console.log('🔍 AUTH DEBUG: Authentication successful for user:', user.id);
     // Add user to request object
     (request as AuthenticatedRequest).user = user;
 

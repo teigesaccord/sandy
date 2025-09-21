@@ -67,8 +67,8 @@ Inspecting the database
 Environment variables and Next.js
 - For client-side code, use `NEXT_PUBLIC_*` variables (e.g. `NEXT_PUBLIC_API_HOST`).
 - In the `.env` file set:
-  - `NEXT_PUBLIC_API_HOST=http://localhost:8000` (or `http://backend:8000` when appropriate)
-  - `API_HOST=http://backend:8000` (server-side)
+  - `NEXT_PUBLIC_API_HOST=http://localhost:8000`
+  - `API_HOST=http://localhost:8000` (server-side)
 - If Next.js tries to contact the backend during `npm run build`, ensure `API_HOST` points to a reachable backend.
 
 Debugging tips

@@ -6,6 +6,6 @@ router = routers.DefaultRouter()
 router.register(r'', ConversationViewSet, basename='conversation')
 
 urlpatterns = [
-	path('', include(router.urls)),
-	path('users/<uuid:user_id>/', include((router.urls, 'chat'))),
+    # Main chat endpoints: /api/chat/
+    path('', include(router.urls)),
 ]

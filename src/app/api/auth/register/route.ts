@@ -121,9 +121,23 @@ export async function POST(request: NextRequest) {
         console.warn('Failed to record registration interaction', ie);
       }
 
-      return createAuthResponse(
-        { message: 'Registration successful', user: result.user },
-        result.token
+      // Django register endpoint doesn't return tokens, just user info
+      // Registration is successful, but user needs to login separately
+      console.log('🔍 REGISTER DEBUG: Registration successful for user:', result.id);
+
+      return NextResponse.json(
+        { 
+          message: 'Registration successful. Please log in with your credentials.',
+          user: {
+            id: result.id,
+            email: result.email,
+            firstName: result.first_name,
+            lastName: result.last_name,
+            isVerified: false,
+            createdAt: new Date().toISOString()
+          }
+        },
+        { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
       );
 
     } catch (error) {

@@ -47,6 +47,7 @@ services:
       - DATABASE_URL=postgresql://sandy:sandy@db:5432/sandy_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend,0.0.0.0,sandy-backend-1
     volumes:
       - ./backend:/app
     ports:
@@ -63,6 +64,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      - API_HOST=http://backend:8000
+      - NEXT_PUBLIC_API_HOST=http://localhost:8000
+      - DATABASE_URL=postgresql://sandy:sandy@db:5432/sandy_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ./:/app
     ports:

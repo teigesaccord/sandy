@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAIService, checkRateLimit, handleApiError, getCorsHeaders, validateMessage } from '../../../../../lib/services';
 import { UserProfile } from '../../../../../models/UserProfile';
 import PostgreSQLService from '../../../../../services/PostgreSQLService';
-import { requireAuth, type AuthenticatedRequest } from '../../../../../lib/auth';
+import { requireAuth, type AuthenticatedRequest, extractTokenFromRequest } from '../../../../../lib/auth';
 
 
 export const POST = requireAuth(async (
@@ -66,29 +66,38 @@ export const POST = requireAuth(async (
     // Get services
     const aiService = await getAIService();
 
+    // Extract token for PostgreSQL service calls
+    const token = extractTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication token missing' },
+        { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    }
+
     // Get or create user profile via backend API
-    let profile = await PostgreSQLService.getUserProfile(userId);
+    let profile = await PostgreSQLService.getUserProfile(userId, token);
     if (!profile) {
       profile = new UserProfile({ userId });
-      await PostgreSQLService.saveUserProfile(userId, profile);
+      await PostgreSQLService.saveUserProfile(userId, profile, token);
     }
 
     // Process chat message with AI
     const response = await aiService.chat(userId, message, profile, context || {});
 
     // Save the conversation to the backend
-    await PostgreSQLService.saveConversation(userId, 'user', message, context);
-    await PostgreSQLService.saveConversation(userId, 'assistant', response.response);
+    await PostgreSQLService.saveConversation(userId, 'user', message, context, token);
+    await PostgreSQLService.saveConversation(userId, 'assistant', response.response, undefined, token);
 
-    // Record interaction for analytics
-    await PostgreSQLService.recordInteraction(userId, 'chat', {
-      message: message.substring(0, 100),
-      responseLength: response.response.length,
-      intent: response.intent
-    });
+    // TODO: Record interaction for analytics (endpoint not implemented yet)
+    // await PostgreSQLService.recordInteraction(userId, 'chat', {
+    //   message: message.substring(0, 100),
+    //   responseLength: response.response.length,
+    //   intent: response.intent
+    // }, token);
 
     // Save updated profile
-    await PostgreSQLService.saveUserProfile(userId, profile);
+    await PostgreSQLService.saveUserProfile(userId, profile, token);
 
     return NextResponse.json(
       {
@@ -170,16 +179,60 @@ export const GET = requireAuth(async (
       );
     }
 
-  const url = new URL(request.url);
+    const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit') || '50');
     
-    // Get conversation history
-  const history = await PostgreSQLService.getConversationHistory(userId, limit);
+    // Get conversation history from Django backend directly with authentication
+    try {
+      const token = extractTokenFromRequest(request);
+      if (!token) {
+        console.error('No authentication token found in request');
+        return NextResponse.json(
+          { error: 'Authentication token missing' },
+          { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        );
+      }
 
-    return NextResponse.json(
-      { history },
-      { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
-    );
+      const apiHost = (process.env.API_HOST || process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000').replace(/\/$/, '');
+      const djangoUrl = `${apiHost}/api/users/${userId}/chat/?limit=${limit}`;
+      console.log('🔍 CHAT API DEBUG: Calling Django:', djangoUrl);
+      
+      const djangoResponse = await fetch(djangoUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('🔍 CHAT API DEBUG: Django response status:', djangoResponse.status);
+
+      if (!djangoResponse.ok) {
+        const errorText = await djangoResponse.text();
+        console.error('🔍 CHAT API DEBUG: Django error:', djangoResponse.status, errorText);
+        return NextResponse.json(
+          { error: 'Failed to fetch chat history from backend' },
+          { status: djangoResponse.status, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+        );
+      }
+
+      const djangoData = await djangoResponse.json();
+      console.log('🔍 CHAT API DEBUG: Django data structure:', typeof djangoData, Object.keys(djangoData));
+      
+      // Django ViewSet returns paginated results in 'results' field, or direct array
+      const conversations = djangoData.results || djangoData;
+      
+      return NextResponse.json(
+        { history: conversations },
+        { headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    } catch (error) {
+      console.error('🔍 CHAT API DEBUG: Error fetching conversation history:', error);
+      return NextResponse.json(
+        { error: 'Internal server error while fetching chat history' },
+        { status: 500, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    }
 
   } catch (error) {
     const { message, status } = handleApiError(error);
@@ -227,13 +280,22 @@ export const DELETE = requireAuth(async (
       );
     }
 
-  const aiService = await getAIService();
+    // Extract token for PostgreSQL service calls
+    const token = extractTokenFromRequest(request);
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication token missing' },
+        { status: 401, headers: getCorsHeaders(request.headers.get('origin') || undefined) }
+      );
+    }
 
-  // Clear conversation history in AI service
-  aiService.clearUserHistory(userId);
+    const aiService = await getAIService();
 
-  // Clear conversation history in backend via proxy
-  await PostgreSQLService.clearConversationHistory(userId);
+    // Clear conversation history in AI service
+    aiService.clearUserHistory(userId);
+
+    // Clear conversation history in backend via proxy
+    await PostgreSQLService.clearConversationHistory(userId, token);
 
     return NextResponse.json(
       { message: 'Conversation history cleared successfully' },

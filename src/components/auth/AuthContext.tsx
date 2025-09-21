@@ -47,9 +47,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const checkAuth = async () => {
     try {
-      const data = await PostgreSQLService.me();
-      if (data) setUser(data);
-      else setUser(null);
+      const response = await fetch('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include' // Include HTTP-only cookies
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
     } catch (err) {
       console.log('Auth check failed:', err);
       setUser(null);
@@ -61,32 +69,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const data = await PostgreSQLService.login(email, password);
-      // PostgreSQLService.login stores tokens and returns token payload / user info when available
-      if (data) {
-        // Add small delay to ensure localStorage is updated
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Try to fetch /me to get user object
-        try {
-          const me = await PostgreSQLService.me();
-          setUser(me || null);
-          return { success: true };
-        } catch (err) {
-          console.error('Failed to fetch user after login:', err);
-          setUser(null);
-          return { success: false, error: 'Failed to verify login. Please try again.' };
-        }
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Include cookies for HTTP-only cookie setting
+        body: JSON.stringify({ email, password })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+        return { success: true };
+      } else {
+        const errorData = await response.json();
+        return { success: false, error: errorData.error || 'Login failed' };
       }
-      return { success: false, error: 'Login failed' };
     } catch (error: any) {
       console.error('Login error:', error);
-      let errorMessage = 'Network error occurred';
-      if (error.message.includes('400')) {
-        errorMessage = 'Invalid email or password';
-      } else if (error.message.includes('429')) {
-        errorMessage = 'Too many login attempts. Please try again later.';
-      }
-      return { success: false, error: errorMessage };
+      return { success: false, error: 'Network error occurred' };
     }
   };
 
@@ -97,18 +99,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     lastName?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const data = await PostgreSQLService.register(email, password, firstName, lastName);
-      if (data) {
-        // After registration, attempt to login automatically (if tokens provided)
-        try {
-          const me = await PostgreSQLService.me();
-          setUser(me || null);
-        } catch (err) {
-          setUser(null);
-        }
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Include cookies for HTTP-only cookie setting
+        body: JSON.stringify({ email, password, firstName, lastName })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Registration successful but doesn't auto-login, user needs to login separately
+        console.log('Registration successful:', data.message);
         return { success: true };
+      } else {
+        const errorData = await response.json();
+        return { success: false, error: errorData.error || 'Registration failed' };
       }
-      return { success: false, error: 'Registration failed' };
     } catch (error) {
       console.error('Registration error:', error);
       return { success: false, error: 'Network error occurred' };
@@ -117,7 +125,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async (): Promise<void> => {
     try {
-      await PostgreSQLService.logout();
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include' // Include cookies for logout
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

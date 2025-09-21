@@ -24,13 +24,25 @@ function AuthenticatedRecommendationsPage() {
     
     setIsLoading(true);
     try {
-      const data = await PostgreSQLService.getUserProfile(user.id);
-      setUserProfile(data);
-    } catch (error: any) {
-      console.error('Failed to load user profile:', error);
-      if (error.message.includes('Authentication expired')) {
+      const response = await fetch(`/api/users/${user.id}/profile`, {
+        method: 'GET',
+        credentials: 'include' // Include HTTP-only cookies for authentication
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data.profile);
+      } else if (response.status === 401) {
+        // Authentication expired
+        console.log('Authentication expired, logging out...');
+        logout();
+      } else {
+        console.error('Failed to load user profile:', response.status, response.statusText);
         setUserProfile(null);
       }
+    } catch (error: any) {
+      console.error('Failed to load user profile:', error);
+      setUserProfile(null);
     } finally {
       setIsLoading(false);
     }

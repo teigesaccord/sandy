@@ -1,7 +1,7 @@
 {
-  "name": "personalized-support-chatbot",
+  "name": "sandy-accessibility-chatbot",
   "version": "1.0.0",
-  "description": "A personalized support chatbot using Next.js, TypeScript, and AI for tailored recommendations",
+  "description": "An accessibility help chatbot providing personalized support for people with disabilities using Next.js, TypeScript, Django, and AI",
   "private": true,
   "type": "module",
   "scripts": {
@@ -28,13 +28,17 @@
     "test:integration": "node test/integration-test.js"
   },
   "keywords": [
+    "accessibility",
+    "disability-support",
+    "assistive-technology",
     "chatbot",
     "ai",
     "personalization",
-    "support",
-    "recommendations",
+    "wcag",
+    "inclusive-design",
     "nextjs",
     "typescript",
+    "django",
     "react"
   ],
   "author": "Your Name",

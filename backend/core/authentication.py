@@ -19,7 +19,7 @@ class CustomJWTAuthentication(JWTAuthentication):
     
     def authenticate(self, request):
         """
-        First try query parameter (no CORS issues), then headers
+        First try query parameter (no CORS issues), then cookies, then headers
         """
         logger.info(f"CustomJWT: Authenticating request to {request.path}")
         
@@ -37,6 +37,21 @@ class CustomJWTAuthentication(JWTAuthentication):
                 pass
         else:
             logger.info("CustomJWT: No token found in query parameters")
+        
+        # Try HTTP-only auth-token cookie
+        cookie_token = request.COOKIES.get('auth-token')
+        if cookie_token:
+            logger.info(f"CustomJWT: Found token in cookie: {cookie_token[:50]}...")
+            try:
+                validated_token = AccessToken(cookie_token)
+                user = self.get_user(validated_token)
+                logger.info(f"CustomJWT: Successfully authenticated user {user.id} via cookie")
+                return (user, validated_token)
+            except (InvalidToken, TokenError) as e:
+                logger.warning(f"CustomJWT: Cookie token validation failed: {e}")
+                pass
+        else:
+            logger.info("CustomJWT: No token found in cookies")
         
         # Fall back to standard header-based authentication
         logger.info("CustomJWT: Falling back to header-based authentication")

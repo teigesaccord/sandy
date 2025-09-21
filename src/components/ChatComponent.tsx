@@ -51,10 +51,16 @@ export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
 
   const loadConversationHistory = async () => {
     try {
-      const response = await fetch(`/api/users/${userId}/chat?limit=50`);
+      const response = await fetch(`/api/users/${userId}/chat?limit=50`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include' // Include cookies for authentication
+      });
       if (response.ok) {
         const data = await response.json();
-        const historyMessages: ChatMessage[] = data.conversations.map((conv: any) => ({
+        const historyMessages: ChatMessage[] = data.history.map((conv: any) => ({
           id: conv.id.toString(),
           role: conv.messageType,
           content: conv.messageText,
@@ -101,8 +107,9 @@ export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
       const response = await fetch(`/api/users/${userId}/chat`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
+        credentials: 'include', // Include cookies for authentication
         body: JSON.stringify({
           message,
           context: {
@@ -178,7 +185,11 @@ export function ChatComponent({ userId, className = '' }: ChatComponentProps) {
 
     try {
       const response = await fetch(`/api/users/${userId}/chat`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include' // Include cookies for authentication
       });
 
       if (response.ok) {

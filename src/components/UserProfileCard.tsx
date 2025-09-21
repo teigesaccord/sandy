@@ -30,8 +30,20 @@ export function UserProfileCard({ userId, profile, onUpdateProfile, className = 
     
     setIsLoading(true);
     try {
-      const data = await PostgreSQLService.getUserProfile(userId);
-      setLocalProfile(data);
+      const response = await fetch(`/api/users/${userId}/profile`, {
+        method: 'GET',
+        credentials: 'include' // Include HTTP-only cookies for authentication
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLocalProfile(data.profile);
+      } else if (response.status === 401) {
+        // Authentication expired
+        console.log('Authentication expired in UserProfileCard');
+      } else {
+        console.error('Failed to load user profile:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error('Failed to load profile:', error);
     } finally {

@@ -24,16 +24,25 @@ function AuthenticatedHomePage() {
     if (!user) return;
 
     try {
-      const data = await PostgreSQLService.getUserProfile(user.id);
-      setUserProfile(data);
+      const response = await fetch(`/api/users/${user.id}/profile`, {
+        method: 'GET',
+        credentials: 'include' // Include HTTP-only cookies for authentication
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data.profile);
+      } else if (response.status === 401) {
+        // Authentication expired
+        console.log('Authentication expired, logging out...');
+        logout();
+      } else {
+        console.error('Failed to load user profile:', response.status, response.statusText);
+        setUserProfile(null);
+      }
     } catch (error: any) {
       console.error('Failed to load user profile:', error);
-      // If authentication expired, the service will automatically redirect
-      // Just log the error and clear the profile
-      if (error.message.includes('Authentication expired')) {
-        setUserProfile(null);
-        // logout() will be called by the service's handleUnauthorized method
-      }
+      setUserProfile(null);
     }
   };
 
